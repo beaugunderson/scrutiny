@@ -1,9 +1,11 @@
 ﻿using System;
 using System.ComponentModel;
 using System.IO;
+using System.Threading;
 
 using NTFS;
 using NTFS.PInvoke;
+
 using Scrutiny.Utilities;
 using Scrutiny.Extensions;
 
@@ -12,25 +14,9 @@ namespace Scrutiny.Models
     [Serializable]
     public class SearchResult : INotifyPropertyChanged, IComparable
     {
-        public Win32.UsnEntry UsnEntry
-        {
-            get;
-            set;
-        }
-
         private static readonly AlphanumComparator<SearchResult>  AlphanumComparator = new AlphanumComparator<SearchResult>();
 
         private readonly string _driveName;
-
-        [NonSerialized]
-        private UsnJournal _journal;
-        private UsnJournal Journal
-        {
-            get
-            {
-                return _journal ?? (_journal = new UsnJournal(new DriveInfo(_driveName)));
-            }
-        }
 
         public SearchResult(Win32.UsnEntry usnEntry, UsnJournal journal)
         {
@@ -40,12 +26,30 @@ namespace Scrutiny.Models
             _driveName = journal.RootDirectory.FullName;
         }
 
+        public Win32.UsnEntry UsnEntry
+        {
+            get;
+            set;
+        }
+        
+        [NonSerialized]
+        private UsnJournal _journal;
+        private UsnJournal Journal
+        {
+            get
+            {
+                LazyInitializer.EnsureInitialized(ref _journal, () => new UsnJournal(new DriveInfo(_driveName)));
+
+                return _journal;
+            }
+        }
+
         private string _location;
         public string Location
         {
             get
             {
-                if (String.IsNullOrEmpty(_location))
+                LazyInitializer.EnsureInitialized(ref _location, delegate
                 {
                     string path;
 
@@ -53,15 +57,11 @@ namespace Scrutiny.Models
 
                     if (result != UsnJournal.UsnJournalReturnCode.USN_JOURNAL_SUCCESS)
                     {
-                        _location = "";
+                        return string.Empty;
                     }
-                    else
-                    {
-                        path = path.TrimStart('\\');
 
-                        _location = Path.Combine(Journal.RootDirectory.FullName, path);
-                    }
-                }
+                    return Path.Combine(Journal.RootDirectory.FullName, path.TrimStart('\\'));
+                });
 
                 return _location;
             }

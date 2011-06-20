@@ -77,6 +77,7 @@
     <Compile Include="Utilities\ObservableCollectionExtensions.cs" />
     <Compile Include="Utilities\Paths.cs" />
     <Compile Include="Utilities\ThreadSafeObservableCollection.cs" />
+    <Compile Include="Windows\HighlightConverter.xaml.cs" />
     <Compile Include="WPF\ColorCombination.cs" />
     <Compile Include="Windows\MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>

@@ -12,20 +12,23 @@ namespace Scrutiny.Utilities
             set;
         }
 
-        public bool IsUiTask
+        public override string ToString()
         {
-            get;
-            set;
+            return Description;
         }
 
-        public DescriptiveTask(Action action, string description, bool isUiTask = false): base(action)
+        public DescriptiveTask(Action action, string description): base(action)
         {
             Description = description;
-            IsUiTask = isUiTask;
         }
 
         public DescriptiveTask(Action action) : base(action)
         {
+        }
+
+        public DescriptiveTask(Action action, CancellationToken cancellationToken, string description) : base(action, cancellationToken)
+        {
+            Description = description;
         }
 
         public DescriptiveTask(Action action, CancellationToken cancellationToken) : base(action, cancellationToken)

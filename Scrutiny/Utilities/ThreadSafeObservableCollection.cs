@@ -18,6 +18,7 @@ namespace Scrutiny.Utilities
 
         public ThreadSafeObservableCollection(IEnumerable<T> list = null, int? capacity = null, SynchronizationContext synchronizationContext = null)
         {
+            // XXX: Use Dispatcher instead?
             if (synchronizationContext == null)
             {
                _synchronizationContext = SynchronizationContext.Current;
@@ -117,21 +118,39 @@ namespace Scrutiny.Utilities
         {
             var list = Items as List<T>;
 
-            if (list != null)
+            if (list == null)
             {
-                list.Sort(selector, comparer);
+                return;
             }
+
+            list.Sort(selector, comparer);
+
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+        }
+
+        public void SortDescending<TValue>(Func<T, TValue> selector, IComparer<TValue> comparer = null)
+        {
+            var list = Items as List<T>;
+
+            if (list == null)
+            {
+                return;
+            }
+
+            list.SortDescending(selector, comparer);
 
             OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
         }
 
         protected override void InsertItem(int index, T item)
         {
+            // XXX: Use dispatcher instead?
             _synchronizationContext.Send(InsertItem, new InsertItemParameter(index, item));
         }
 
         protected override void MoveItem(int oldIndex, int newIndex)
         {
+            // XXX: Use dispatcher instead?
             _synchronizationContext.Send(MoveItem, new MoveItemParameter(oldIndex, newIndex));
         }
 

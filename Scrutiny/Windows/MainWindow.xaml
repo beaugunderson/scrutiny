@@ -16,7 +16,7 @@
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="Padding" Value="12,0,12,0"></Setter>
         </Style>
-    
+
         <Style TargetType="{x:Type GridViewColumnHeader}">
             <Setter Property="Padding" Value="12,0,12,0"></Setter>
         </Style>
@@ -41,17 +41,28 @@
         <DockPanel>
             <Menu IsMainMenu="True" DockPanel.Dock="Top">
                 <MenuItem Header="_File">
-                    <MenuItem Header="E_xit" IsCheckable="true" Command="Close" InputGestureText="Alt+F4" />
+                    <MenuItem Header="E_xit" IsCheckable="true" InputGestureText="Alt+F4" Name="ExitMenuItem" Click="ExitMenuItem_Click" />
                 </MenuItem>
 
-                <MenuItem Header="_Edit" />
+                <MenuItem Header="_Edit">
+                    <MenuItem Header="_Undo" InputGestureText="Ctrl+Z" Command="Undo" />
+                    <MenuItem Header="_Redo" InputGestureText="Ctrl+Y" Command="Redo" />
+                    
+                    <Separator />
+                    
+                    <MenuItem Header="Cu_t" InputGestureText="Ctrl+X" Command="Cut" />
+                    <MenuItem Header="_Copy" InputGestureText="Ctrl+C" Command="Copy" />
+                    <MenuItem Header="_Paste" InputGestureText="Ctrl+V" Command="Paste" />
+                    <MenuItem Header="_Delete" InputGestureText="Del" Command="Delete" />
+                </MenuItem>
 
                 <MenuItem Header="_Options">
-                    <MenuItem Header="Case Sensitive" IsCheckable="True" />
-                    <MenuItem Header="Match All" IsCheckable="True" />
-                    <MenuItem Header="Match Location" IsCheckable="True" />
+                    <MenuItem Header="Verbatim" IsCheckable="True" IsChecked="{Binding Path=Verbatim}" />
+                    <MenuItem Header="Case Sensitive" IsCheckable="True" IsChecked="{Binding Path=CaseSensitive}" />
+                    <MenuItem Header="Match Location" IsCheckable="True" IsChecked="{Binding Path=SearchInLocation}" />
+                    <MenuItem Header="Regular Expressions" IsCheckable="True" IsChecked="{Binding Path=RegularExpressions}" />
                 </MenuItem>
-                
+
                 <MenuItem Header="_Help">
                     <MenuItem Header="_About..." />
                 </MenuItem>
@@ -92,7 +103,7 @@
                                 </DataTemplate>
                             </GridViewColumn.CellTemplate>
 
-                            <GridViewColumnHeader Click="GridViewColumnHeader_Click" Content="Name" />
+                            <GridViewColumnHeader Name="Name" Click="GridViewColumnHeader_Click" Content="Name" />
                         </GridViewColumn>
 
                         <GridViewColumn Width="350">
@@ -109,15 +120,15 @@
                                 </DataTemplate>
                             </GridViewColumn.CellTemplate>
 
-                            <GridViewColumnHeader Click="GridViewColumnHeader_Click" Content="Location" />
+                            <GridViewColumnHeader Name="Location" Click="GridViewColumnHeader_Click" Content="Location" />
                         </GridViewColumn>
 
                         <GridViewColumn DisplayMemberBinding="{Binding Path=FormattedSize}" Width="50">
-                            <GridViewColumnHeader Click="GridViewColumnHeader_Click" Content="Size" />
+                            <GridViewColumnHeader Name="Size" Click="GridViewColumnHeader_Click" Content="Size" />
                         </GridViewColumn>
 
                         <GridViewColumn DisplayMemberBinding="{Binding Path=LastModified}" Width="150">
-                            <GridViewColumnHeader Click="GridViewColumnHeader_Click" Content="Last Modified" />
+                            <GridViewColumnHeader Name="LastModified" Click="GridViewColumnHeader_Click" Content="Last Modified" />
                         </GridViewColumn>
                     </GridView>
                 </ListView.View>
@@ -125,7 +136,7 @@
         </DockPanel>
 
         <StatusBar Name="statusBar" Height="30" VerticalAlignment="Bottom" Grid.Row="1">
-            <TextBlock Name="statusTextBlock">Status</TextBlock>
+            <TextBlock Name="statusTextBlock" Text="{Binding Path=RunningTasks, UpdateSourceTrigger=PropertyChanged}" />
 
             <Separator />
 

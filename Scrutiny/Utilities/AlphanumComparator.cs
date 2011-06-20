@@ -57,7 +57,9 @@ namespace Scrutiny.Utilities
                     character = s[marker];
 
                     if (!char.IsDigit(character))
+                    {
                         break;
+                    }
 
                     chunk.Append(character);
 
@@ -71,7 +73,9 @@ namespace Scrutiny.Utilities
                     character = s[marker];
 
                     if (char.IsDigit(character))
+                    {
                         break;
+                    }
 
                     chunk.Append(character);
 
@@ -129,7 +133,9 @@ namespace Scrutiny.Utilities
                 }
 
                 if (result != 0)
+                {
                     return result;
+                }
             }
 
             return s1.Length - s2.Length;

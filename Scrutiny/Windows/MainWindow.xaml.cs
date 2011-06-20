@@ -2,17 +2,13 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Media;
 using System.Windows.Threading;
 
 using NTFS;
@@ -20,8 +16,6 @@ using NTFS.PInvoke;
 
 using Scrutiny.Models;
 using Scrutiny.Utilities;
-using Scrutiny.WPF;
-using Scrutiny.Extensions;
 
 namespace Scrutiny.Windows
 {
@@ -36,15 +30,16 @@ namespace Scrutiny.Windows
         private ThreadSafeObservableCollection<SearchResult> _searchResults;
         private ThreadSafeObservableCollection<SearchResult> _displaySearchResults;
 
-        public bool CaseSensitive { get; set; }
-        public bool SearchInPath { get; set; }
-
         private const int SearchTimeout = 250;
 
         private readonly BlockingCollection<DescriptiveTask> _tasks = new BlockingCollection<DescriptiveTask>();
+        private readonly List<DescriptiveTask> _runningTasks = new List<DescriptiveTask>();
+        
         private Task _taskConsumer;
 
-        private readonly TaskScheduler _uiTaskScheduler = TaskScheduler.FromCurrentSynchronizationContext();
+        private readonly DispatcherSynchronizationContext _uiSynchronizationContext;
+
+        private readonly CancellationTokenSource _tokenSource = new CancellationTokenSource();
 
         private const string JournalCacheName = "Journal.cache";
 
@@ -102,8 +97,6 @@ namespace Scrutiny.Windows
                 typeof(MainWindow),
                 new PropertyMetadata(default(string)));
 
-        private DispatcherSynchronizationContext _uiSynchronizationContext;
-
         public string SearchTerm
         {
             get
@@ -117,27 +110,57 @@ namespace Scrutiny.Windows
             }
         }
 
+        public static readonly DependencyProperty CaseSensitiveProperty =
+            DependencyProperty.Register("CaseSensitive",
+            typeof (bool),
+            typeof (MainWindow), 
+            new PropertyMetadata(default(bool)));
+
+        public bool CaseSensitive
+        {
+            get
+            {
+                return (bool) GetValue(CaseSensitiveProperty);
+            }
+            
+            set
+            {
+                SetValue(CaseSensitiveProperty, value);
+            }
+        }
+
+        public static readonly DependencyProperty SearchInLocationProperty =
+            DependencyProperty.Register("SearchInLocation", typeof (bool), typeof (MainWindow), new PropertyMetadata(default(bool)));
+
+        public bool SearchInLocation
+        {
+            get
+            {
+                return (bool) GetValue(SearchInLocationProperty);
+            }
+         
+            set
+            {
+                SetValue(SearchInLocationProperty, value);
+            }
+        }
+
         public MainWindow()
         {
             InitializeComponent();
 
-            _uiSynchronizationContext = new DispatcherSynchronizationContext(Application.Current.Dispatcher);
-            
-            //SynchronizationContext.SetSynchronizationContext(context);
-
-            _taskConsumer = Task.Factory.StartNew(() => ConsumeTasks(_tasks));
-            
             SearchResults = new ThreadSafeObservableCollection<SearchResult>(null, 750000);
             DisplaySearchResults = new ThreadSafeObservableCollection<SearchResult>();
 
-            CaseSensitive = true;
-            SearchInPath = false;
+            _uiSynchronizationContext = new DispatcherSynchronizationContext(Application.Current.Dispatcher);
+            _taskConsumer = Task.Factory.StartNew(() => ConsumeTasks(_tasks));
             
             _updateFilter = new DeferredAction(FilterResults);
 
-            string[] drives = { "C" };
-
             _journals = new List<UsnJournal>();
+
+            // TODO: Convert to a user setting
+            string[] drives = { "C" };
 
             DataContext = this;
 
@@ -146,13 +169,25 @@ namespace Scrutiny.Windows
                 return;
             }
 
-            _tasks.Add(new DescriptiveTask(delegate
+            AddTask(() => EnumerateJournals(drives), "Enumerating journals");
+        }
+
+        private void EnumerateJournals(IEnumerable<string> drives)
+        {
+            foreach (var drive in drives)
             {
-                foreach (var drive in drives)
-                {
-                    _journals.Add(new UsnJournal(new DriveInfo(drive)));
-                }
-            }, "Enumerating journals"));
+                _journals.Add(new UsnJournal(new DriveInfo(drive)));
+            }
+        }
+
+        private void AddTask(Action action, string description)
+        {
+            _tasks.Add(new DescriptiveTask(action, _tokenSource.Token, description));
+        }
+
+        private void AddTask(DescriptiveTask task)
+        {
+            _tasks.Add(task);
         }
 
         private void ConsumeTasks(BlockingCollection<DescriptiveTask> tasks)
@@ -162,20 +197,50 @@ namespace Scrutiny.Windows
                 foreach (var task in tasks.GetConsumingEnumerable()) {
                     var currentTask = task;
 
-                    UpdateStatus(task.Description);
+                    currentTask.Start();
 
-                    Console.WriteLine("Starting task: {0}", task.Description);
+                    _runningTasks.Add(currentTask);
 
-                    if (currentTask.IsUiTask)
+                    UpdateRunningTasks();
+
+                    currentTask.ContinueWith(result =>
                     {
-                        currentTask.Start(_uiTaskScheduler);
-                    }
-                    else
-                    {
-                        currentTask.Start();
-                    }
+                        _runningTasks.Remove(currentTask);
+
+                        UpdateRunningTasks();
+                    });
                 }
             }
+        }
+
+        public static readonly DependencyProperty RunningTasksProperty =
+            DependencyProperty.Register("RunningTasks",
+                typeof (string),
+                typeof (MainWindow),
+                new PropertyMetadata(default(string)));
+
+        public string RunningTasks
+        {
+            get
+            {
+                return (string)GetValue(RunningTasksProperty);
+            }
+
+            set
+            {
+                SetValue(RunningTasksProperty, value);
+            }
+        }
+
+        private void UpdateRunningTasks()
+        {
+            var runningTasks = string.Join(", ", _runningTasks
+                .Select(task => task.Description).ToList());
+
+            InvokeIfNeeded(() =>
+            {
+                RunningTasks = String.IsNullOrEmpty(runningTasks) ? "Idle" : runningTasks;
+            });
         }
 
         private void FilterResults()
@@ -186,8 +251,6 @@ namespace Scrutiny.Windows
             }
             else
             {
-                UpdateStatus("Filtering");
-
                 IEnumerable<SearchResult> list;
 
                 if (CaseSensitive)
@@ -208,19 +271,12 @@ namespace Scrutiny.Windows
                 {
                     bindingExpression.UpdateSource();
                 }
-
-                UpdateStatus("Idle");
             }
         }
 
         private bool SearchNameCaseInsensitive(SearchResult result)
         {
-            if (result.Name.ToLower().Contains(SearchTerm.ToLower()))
-            {
-                return true;
-            }
-
-            return false;
+            return result.Name.ToLower().Contains(SearchTerm.ToLower());
         }
 
         private bool SearchNameCaseInsensitiveMultiple(SearchResult result)
@@ -233,12 +289,7 @@ namespace Scrutiny.Windows
 
         private bool SearchName(SearchResult result)
         {
-            if (result.Name.Contains(SearchTerm))
-            {
-                return true;
-            }
-
-            return false;
+            return result.Name.Contains(SearchTerm);
         }
 
         private bool SearchNameMultiple(SearchResult result)
@@ -247,12 +298,6 @@ namespace Scrutiny.Windows
 
             // Could also use terms.Any
             return terms.All(term => result.Name.Contains(term));
-        }
-
-        private void UpdateStatus(object format, params object[] text)
-        {
-            InvokeIfNeeded(() => 
-                statusTextBlock.Text = string.Format(Convert.ToString(format), text.Select(Convert.ToString)));
         }
 
         private void InvokeIfNeeded(Action action)
@@ -297,14 +342,12 @@ namespace Scrutiny.Windows
             {
                 var localJournal = journal;
 
-                _tasks.Add(new DescriptiveTask(() => ScanDirectories(localJournal),
-                    string.Format("Scanning {0} files", journal.RootDirectory)));
+                AddTask(() => ScanDirectories(localJournal),
+                    string.Format("Scanning {0} files", journal.RootDirectory));
 
-                _tasks.Add(new DescriptiveTask(() => ScanFiles(localJournal),
-                    string.Format("Scanning {0} folders", journal.RootDirectory)));
+                AddTask(() => ScanFiles(localJournal),
+                    string.Format("Scanning {0} folders", journal.RootDirectory));
             }
-
-            UpdateStatus("Idle");
         }
 
         private ListCollectionView GetView()
@@ -322,22 +365,25 @@ namespace Scrutiny.Windows
             var task = new DescriptiveTask(delegate
             {
                 SearchResults = ThreadSafeObservableCollection<SearchResult>.DeserializeFromList(Paths.CombineBaseDirectory(JournalCacheName), _uiSynchronizationContext);
-            }, "Loading cache");
+            },
+            _tokenSource.Token,
+            "Loading cache");
 
             if (File.Exists(Paths.CombineBaseDirectory(JournalCacheName)))
             {
-                _tasks.Add(task);
+                AddTask(task);
             }
 
-            _tasks.Add(new DescriptiveTask(delegate
+            AddTask(delegate
             {
+                // XXX: What happens if the file didn't exist and the task above never ran?
                 task.Wait();
 
                 if (SearchResults.Count == 0)
                 {
                     RefreshUsnJournal();
                 }
-            }, "Refreshing USN journal"));
+            }, "Refreshing USN journal");
         }
 
         private void resultsListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -350,11 +396,51 @@ namespace Scrutiny.Windows
             
         }
 
+        private bool _descending;
         private void GridViewColumnHeader_Click(object sender, RoutedEventArgs e)
         {
-            _tasks.Add(new DescriptiveTask(() => 
-                 DisplaySearchResults.Sort(item => item.Location, new AlphanumComparator<string>()), 
-                "Sorting items"));
+            var column = sender as GridViewColumnHeader;
+
+            if (column == null)
+            {
+                return;
+            }
+
+            Func<SearchResult, object> function = item => item.Location;
+            IComparer<object> comparer = null;
+
+            switch (column.Name)
+            {
+                case "Name":
+                    function = item => item.Name;
+                    comparer = new AlphanumComparator<object>();
+
+                    break;
+                case "Location":
+                    function = item => item.Location;
+                    comparer = new AlphanumComparator<object>();
+
+                    break;
+                case "Size":
+                    function = item => item.Size;
+
+                    break;
+                case "LastModified":
+                    function = item => item.LastModified;
+
+                    break;
+            }
+
+            if (_descending)
+            {
+                AddTask(() => DisplaySearchResults.SortDescending(function, comparer), "Sorting items");
+            }
+            else
+            {
+                AddTask(() => DisplaySearchResults.Sort(function, comparer), "Sorting items");
+            }
+
+            _descending = !_descending;
         }    
         
         public event PropertyChangedEventHandler PropertyChanged;
@@ -371,128 +457,15 @@ namespace Scrutiny.Windows
 
         private void Window_Closing(object sender, CancelEventArgs e)
         {
+            _tokenSource.Cancel();
+
+            // TODO: Display progress window
             SearchResults.SerializeToList(Paths.CombineBaseDirectory(JournalCacheName));
         }
-    }
 
-    /// <summary>
-    /// Takes two values, one being a string and the other being a search term to highlight
-    /// </summary>
-    /// <returns>
-    /// A <see cref="TextBlock"/> with Inlines collection filled with <see cref="Run"/> elements.
-    /// </returns>
-    public class HighlightConverter : IMultiValueConverter
-    {
-        private readonly ColorCombination[] _colorCombinations = new[]
+        private void ExitMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            new ColorCombination(new SolidColorBrush(Colors.GreenYellow), new SolidColorBrush(Colors.Green)), 
-            new ColorCombination(new SolidColorBrush(Colors.OrangeRed), new SolidColorBrush(Colors.DarkRed)), 
-            new ColorCombination(new SolidColorBrush(Colors.Yellow), new SolidColorBrush(Colors.DarkOrange)) 
-        };
-
-        private class ColorMatch
-        {
-            public int ColorIndex
-            {
-                get;
-                set;
-            }
-
-            public Match Match
-            {
-                get;
-                set;
-            }
-
-            public ColorMatch(Match match, int colorIndex)
-            {
-                Match = match;
-                ColorIndex = colorIndex;
-            }
-        }
-
-        public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
-        {
-            if ((bool)(DesignerProperties.IsInDesignModeProperty.GetMetadata(typeof(DependencyObject)).DefaultValue))
-            {
-                return values;
-            }
-
-            var value = System.Convert.ToString(values[0]);
-
-            if (values[1] == DependencyProperty.UnsetValue)
-            {
-                return value;
-            }
-
-            var terms = (string)values[1];
-
-            if (string.IsNullOrEmpty(terms))
-            {
-                return value;
-            }
-
-            // Highlight the search terms
-            int count = 0;
-
-            var colorMatches = new List<ColorMatch>();
-
-            foreach (var term in terms.Split(new[] {" "}, StringSplitOptions.RemoveEmptyEntries))
-            {
-                var matches = Regex.Matches(value, Regex.Escape(term));
-
-                colorMatches.AddRange(from Match match in matches select new ColorMatch(match, count));
-
-                count++;
-            }
-
-            colorMatches.Sort(item => item.Match.Index);
-
-            var textBlock = new TextBlock
-            {
-                Padding = new Thickness(0, 1, 0, 1)
-            };
-
-            int index = 0;
-
-            foreach (var match in colorMatches)
-            {
-                textBlock.Inlines.Add(value.Slice(index, match.Match.Index));
-
-                index = match.Match.Index + match.Match.Length;
-
-                // TODO: Change look to a user setting
-                var border = new Border
-                {
-                    Background = _colorCombinations[match.ColorIndex].Background,
-                    BorderBrush = _colorCombinations[match.ColorIndex].Border,
-                    BorderThickness = new Thickness(1),
-                    Margin = new Thickness(0.5, -1, 0.5, -1),
-                    CornerRadius = new CornerRadius(1),
-                    Child = new TextBlock(new Run(match.Match.Value))
-                    {
-                        Foreground = _colorCombinations[match.ColorIndex].Foreground,
-                        Padding = new Thickness(0)
-                    }
-                };
-
-                var container = new InlineUIContainer(border)
-                {
-                    BaselineAlignment = BaselineAlignment.Bottom,
-                    FontWeight = FontWeights.Bold
-                };
-
-                textBlock.Inlines.Add(container);
-            }
-
-            textBlock.Inlines.Add(value.Slice(index, value.Length));
-
-            return textBlock;
-        }
-
-        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
-        {
-            throw new NotSupportedException();
+            Application.Current.Shutdown();
         }
     }
 }
