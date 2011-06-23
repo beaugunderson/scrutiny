@@ -8,7 +8,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
 using System.Windows.Threading;
 
 using NTFS;
@@ -16,6 +15,7 @@ using NTFS.PInvoke;
 
 using Scrutiny.Models;
 using Scrutiny.Utilities;
+using Scrutiny.WPF;
 
 namespace Scrutiny.Windows
 {
@@ -30,6 +30,15 @@ namespace Scrutiny.Windows
         private ThreadSafeObservableCollection<SearchResult> _searchResults;
         private ThreadSafeObservableCollection<SearchResult> _displaySearchResults;
 
+        // XXX: Is it silly to have a field too?
+        private string _searchTerm;
+        private string _searchTermLower;
+
+        private string[] _searchTerms;
+        private string[] _searchTermsLower;
+        
+        private readonly Dictionary<PredicateOption, Func<SearchResult, bool>> _predicates;
+
         private const int SearchTimeout = 250;
 
         private readonly BlockingCollection<DescriptiveTask> _tasks = new BlockingCollection<DescriptiveTask>();
@@ -43,6 +52,13 @@ namespace Scrutiny.Windows
 
         private const string JournalCacheName = "Journal.cache";
 
+        private bool _descending;
+        private bool _parallel = true;
+
+        private readonly PropertyChangeNotifier _searchTermNotifier;
+        private GridViewColumnHeader _lastColumnClicked;
+
+        #region Dependency Properties
         public ThreadSafeObservableCollection<SearchResult> SearchResults
         {
             get
@@ -69,6 +85,54 @@ namespace Scrutiny.Windows
                 _displaySearchResults = value;
             
                 OnPropertyChanged("DisplaySearchResults");
+            }
+        }
+
+        public static readonly DependencyProperty IsRegularExpressionProperty =
+            DependencyProperty.Register("IsRegularExpression", typeof (bool), typeof (MainWindow), new PropertyMetadata(default(bool)));
+
+        public bool IsRegularExpression
+        {
+            get
+            {
+                return (bool) GetValue(IsRegularExpressionProperty);
+            }
+            set
+            {
+                SetValue(IsRegularExpressionProperty, value);
+            }
+        }
+
+        public static readonly DependencyProperty IsCaseSensitiveProperty =
+            DependencyProperty.Register("IsCaseSensitive", typeof (bool), typeof (MainWindow), new PropertyMetadata(default(bool)));
+
+        public bool IsCaseSensitive
+        {
+            get
+            {
+                return (bool) GetValue(IsCaseSensitiveProperty);
+            }
+            set
+            {
+                SetValue(IsCaseSensitiveProperty, value);
+            }
+        }
+
+        public static readonly DependencyProperty IsMultipleTermsProperty =
+            DependencyProperty.Register("IsMultipleTerms",
+                typeof (bool),
+                typeof (MainWindow),
+                new PropertyMetadata(default(bool)));
+
+        public bool IsMultipleTerms
+        {
+            get
+            {
+                return (bool) GetValue(IsMultipleTermsProperty);
+            }
+            set
+            {
+                SetValue(IsMultipleTermsProperty, value);
             }
         }
 
@@ -110,22 +174,18 @@ namespace Scrutiny.Windows
             }
         }
 
-        public static readonly DependencyProperty CaseSensitiveProperty =
-            DependencyProperty.Register("CaseSensitive",
-            typeof (bool),
-            typeof (MainWindow), 
-            new PropertyMetadata(default(bool)));
+        public static readonly DependencyProperty SearchInNameProperty =
+            DependencyProperty.Register("SearchInName", typeof (bool), typeof (MainWindow), new PropertyMetadata(default(bool)));
 
-        public bool CaseSensitive
+        public bool SearchInName
         {
             get
             {
-                return (bool) GetValue(CaseSensitiveProperty);
+                return (bool) GetValue(SearchInNameProperty);
             }
-            
             set
             {
-                SetValue(CaseSensitiveProperty, value);
+                SetValue(SearchInNameProperty, value);
             }
         }
 
@@ -144,6 +204,26 @@ namespace Scrutiny.Windows
                 SetValue(SearchInLocationProperty, value);
             }
         }
+
+        public static readonly DependencyProperty RunningTasksProperty =
+            DependencyProperty.Register("RunningTasks",
+                typeof (string),
+                typeof (MainWindow),
+                new PropertyMetadata(default(string)));
+
+        public string RunningTasks
+        {
+            get
+            {
+                return (string)GetValue(RunningTasksProperty);
+            }
+
+            set
+            {
+                SetValue(RunningTasksProperty, value);
+            }
+        }
+        #endregion
 
         public MainWindow()
         {
@@ -169,7 +249,41 @@ namespace Scrutiny.Windows
                 return;
             }
 
+            _predicates = new Dictionary<PredicateOption, Func<SearchResult, bool>>
+            {
+                {
+                    PredicateOption.None,
+                    result => SearchCaseInsensitive(result.Name)
+                }, 
+                {
+                    PredicateOption.MultipleTerms,
+                    result => SearchCaseInsensitiveMultiple(result.Name)
+                },
+                { 
+                    PredicateOption.CaseSensitive,
+                    result => Search(result.Name) 
+                },
+                {
+                    PredicateOption.CaseSensitive | PredicateOption.MultipleTerms,
+                    result => SearchMultiple(result.Name)
+                }
+            };
+
+            _searchTermNotifier = new PropertyChangeNotifier(this, "SearchTerm");
+            _searchTermNotifier.ValueChanged += OnSearchTermChanged;
+
             AddTask(() => EnumerateJournals(drives), "Enumerating journals");
+        }
+
+        private void OnSearchTermChanged(object sender, EventArgs eventArgs)
+        {
+            _searchTerm = (string)_searchTermNotifier.Value;
+            _searchTermLower = _searchTerm.ToLower();
+
+            _searchTerms = _searchTerm.Split(new[] { " " }, StringSplitOptions.RemoveEmptyEntries);
+            _searchTermsLower = _searchTerms.Select(s => s.ToLower()).ToArray();
+        
+            _updateFilter.Defer(SearchTimeout);
         }
 
         private void EnumerateJournals(IEnumerable<string> drives)
@@ -180,11 +294,13 @@ namespace Scrutiny.Windows
             }
         }
 
+        // TODO: Move to class
         private void AddTask(Action action, string description)
         {
             _tasks.Add(new DescriptiveTask(action, _tokenSource.Token, description));
         }
 
+        // TODO: Move to class
         private void AddTask(DescriptiveTask task)
         {
             _tasks.Add(task);
@@ -213,25 +329,9 @@ namespace Scrutiny.Windows
             }
         }
 
-        public static readonly DependencyProperty RunningTasksProperty =
-            DependencyProperty.Register("RunningTasks",
-                typeof (string),
-                typeof (MainWindow),
-                new PropertyMetadata(default(string)));
-
-        public string RunningTasks
-        {
-            get
-            {
-                return (string)GetValue(RunningTasksProperty);
-            }
-
-            set
-            {
-                SetValue(RunningTasksProperty, value);
-            }
-        }
-
+        /// <summary>
+        /// Update the status bar text with the list of running tasks.
+        /// </summary>
         private void UpdateRunningTasks()
         {
             var runningTasks = string.Join(", ", _runningTasks
@@ -243,6 +343,9 @@ namespace Scrutiny.Windows
             });
         }
 
+        /// <summary>
+        /// Filter the entire list of USN journal entries and display them in the ListView.
+        /// </summary>
         private void FilterResults()
         {
             if (string.IsNullOrWhiteSpace(searchTextBox.Text))
@@ -253,51 +356,87 @@ namespace Scrutiny.Windows
             {
                 IEnumerable<SearchResult> list;
 
-                if (CaseSensitive)
+                // TODO: Benchmark parallel vs. non-parallel
+                // TODO: Benchmark ToList().FindAll() vs. .Where()
+                var options = GetOptions();
+                var predicate = _predicates[options];
+
+                if (_parallel)
                 {
-                    list = SearchResults.ToList().FindAll(SearchNameMultiple);
+                    list = SearchResults.AsParallel().Where(predicate);
                 }
                 else
                 {
-                    list = SearchResults.ToList().FindAll(SearchNameCaseInsensitiveMultiple);
+                    list = SearchResults.Where(predicate);
                 }
 
                 DisplaySearchResults = new ThreadSafeObservableCollection<SearchResult>(list);
-
-                // Update the items bound to the search term here since it's deferred from the actual update
-                var bindingExpression = searchTextBox.GetBindingExpression(TextBox.TextProperty);
-
-                if (bindingExpression != null)
-                {
-                    bindingExpression.UpdateSource();
-                }
             }
         }
 
-        private bool SearchNameCaseInsensitive(SearchResult result)
+        private PredicateOption GetOptions()
         {
-            return result.Name.ToLower().Contains(SearchTerm.ToLower());
+            var option = PredicateOption.None;
+
+            if (IsMultipleTerms)
+            {
+                option = option | PredicateOption.MultipleTerms;
+            }
+
+            if (IsRegularExpression)
+            {
+                option = option | PredicateOption.RegularExpression;
+            }
+
+            if (IsCaseSensitive)
+            {
+                option = option | PredicateOption.CaseSensitive;
+            }
+
+            return option;
         }
 
-        private bool SearchNameCaseInsensitiveMultiple(SearchResult result)
+        private string ActiveFields(SearchResult searchResult)
         {
-            var terms = SearchTerm.ToLower().Split(new[] { " " }, StringSplitOptions.RemoveEmptyEntries);
+            if (SearchInName && SearchInLocation)
+            {
+                return searchResult.PathAndName;
+            }
 
+            if (SearchInName)
+            {
+                return searchResult.Name;
+            }
+
+            if (SearchInLocation)
+            {
+                return searchResult.Path;
+            }
+
+            throw new ArgumentException();
+        }
+
+        // TODO: Move search predicates to a utility class
+        private bool Search(string field)
+        {
+            return field.Contains(_searchTerm);
+        }
+
+        private bool SearchMultiple(string field)
+        {
             // Could also use terms.Any
-            return terms.All(term => result.Name.Contains(term));
+            return _searchTerms.All(field.Contains);
         }
 
-        private bool SearchName(SearchResult result)
+        private bool SearchCaseInsensitive(string field)
         {
-            return result.Name.Contains(SearchTerm);
+            return field.ToLower().Contains(_searchTermLower);
         }
 
-        private bool SearchNameMultiple(SearchResult result)
+        private bool SearchCaseInsensitiveMultiple(string field)
         {
-            var terms = SearchTerm.Split(new[] { " " }, StringSplitOptions.RemoveEmptyEntries);
-
             // Could also use terms.Any
-            return terms.All(term => result.Name.Contains(term));
+            return _searchTermsLower.All(field.ToLower().Contains);
         }
 
         private void InvokeIfNeeded(Action action)
@@ -318,9 +457,17 @@ namespace Scrutiny.Windows
 
             journal.GetNtfsVolumeFolders(out folders);
 
-            foreach (var folder in folders)
+            if (_parallel)
             {
-                SearchResults.Add(new SearchResult(folder, journal));
+                folders.AsParallel()
+                    .ForAll(entry => SearchResults.Add(new SearchResult(entry, journal)));
+            }
+            else
+            {
+                foreach (var folder in folders)
+                {
+                    SearchResults.Add(new SearchResult(folder, journal));
+                }
             }
         }
 
@@ -330,9 +477,17 @@ namespace Scrutiny.Windows
 
             journal.GetFilesMatchingFilter("*", out files);
 
-            foreach (var file in files)
+            if (_parallel)
             {
-                SearchResults.Add(new SearchResult(file, journal));
+                files.AsParallel()
+                    .ForAll(entry => SearchResults.Add(new SearchResult(entry, journal)));
+            }
+            else
+            {
+                foreach (var file in files)
+                {
+                    SearchResults.Add(new SearchResult(file, journal));
+                }
             }
         }
 
@@ -350,15 +505,12 @@ namespace Scrutiny.Windows
             }
         }
 
+/*
         private ListCollectionView GetView()
         {
             return (ListCollectionView)CollectionViewSource.GetDefaultView(DisplaySearchResults);
         }
-
-        private void searchTextBox_TextChanged(object sender, TextChangedEventArgs e)
-        {
-            _updateFilter.Defer(SearchTimeout);
-        }
+*/
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
@@ -372,18 +524,21 @@ namespace Scrutiny.Windows
             if (File.Exists(Paths.CombineBaseDirectory(JournalCacheName)))
             {
                 AddTask(task);
-            }
 
-            AddTask(delegate
-            {
-                // XXX: What happens if the file didn't exist and the task above never ran?
-                task.Wait();
-
-                if (SearchResults.Count == 0)
+                AddTask(delegate
                 {
-                    RefreshUsnJournal();
-                }
-            }, "Refreshing USN journal");
+                    task.Wait();
+
+                    if (SearchResults.Count == 0)
+                    {
+                        RefreshUsnJournal();
+                    }
+                }, "Refreshing USN journal");
+            }
+            else
+            {
+                AddTask(RefreshUsnJournal, "Refreshing USN journal");
+            }
         }
 
         private void resultsListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -393,10 +548,14 @@ namespace Scrutiny.Windows
 
         private void OpenLocation_Click(object sender, RoutedEventArgs e)
         {
-            
+            if (CurrentResult == null)
+            {
+                return;
+            }
+
+            ShowSelectedInExplorer.FileOrFolder(CurrentResult.PathAndName);
         }
 
-        private bool _descending;
         private void GridViewColumnHeader_Click(object sender, RoutedEventArgs e)
         {
             var column = sender as GridViewColumnHeader;
@@ -406,18 +565,18 @@ namespace Scrutiny.Windows
                 return;
             }
 
-            Func<SearchResult, object> function = item => item.Location;
+            Func<SearchResult, object> function = item => item.Path;
             IComparer<object> comparer = null;
 
             switch (column.Name)
             {
-                case "Name":
+                case "FileName":
                     function = item => item.Name;
                     comparer = new AlphanumComparator<object>();
 
                     break;
                 case "Location":
-                    function = item => item.Location;
+                    function = item => item.Path;
                     comparer = new AlphanumComparator<object>();
 
                     break;
@@ -431,18 +590,37 @@ namespace Scrutiny.Windows
                     break;
             }
 
+            if (column != _lastColumnClicked)
+            {
+                _descending = false;
+
+                if (_lastColumnClicked != null)
+                {
+                    _lastColumnClicked.ContentTemplate = null;
+                }
+            }
+            else
+            {
+                _descending = !_descending;
+            }
+
+            // TODO: Cancel other running sort jobs
             if (_descending)
             {
+                column.ContentTemplate = Resources["DescendingTemplate"] as DataTemplate;
+
                 AddTask(() => DisplaySearchResults.SortDescending(function, comparer), "Sorting items");
             }
             else
             {
+                column.ContentTemplate = Resources["AscendingTemplate"] as DataTemplate;
+
                 AddTask(() => DisplaySearchResults.Sort(function, comparer), "Sorting items");
             }
 
-            _descending = !_descending;
-        }    
-        
+            _lastColumnClicked = column;
+        }
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         private void OnPropertyChanged(string propertyName)

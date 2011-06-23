@@ -7,10 +7,9 @@ using System.Linq;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading;
 using System.Windows.Threading;
-
 using Scrutiny.Extensions;
 
-namespace Scrutiny.Utilities
+namespace Scrutiny.WPF
 {
     public class ThreadSafeObservableCollection<T> : ObservableCollection<T>
     {

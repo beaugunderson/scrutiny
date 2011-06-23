@@ -11,9 +11,8 @@ using System.Windows.Documents;
 using System.Windows.Media;
 
 using Scrutiny.Extensions;
-using Scrutiny.WPF;
 
-namespace Scrutiny.Windows
+namespace Scrutiny.WPF
 {
     /// <summary>
     /// Takes two values, one being a string and the other being a search term to highlight

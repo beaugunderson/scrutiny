@@ -11,6 +11,7 @@ using Scrutiny.Extensions;
 
 namespace Scrutiny.Models
 {
+    // TODO: Do we need INotifyPropertyChanged?
     [Serializable]
     public class SearchResult : INotifyPropertyChanged, IComparable
     {
@@ -44,12 +45,12 @@ namespace Scrutiny.Models
             }
         }
 
-        private string _location;
-        public string Location
+        private string _path;
+        public string Path
         {
             get
             {
-                LazyInitializer.EnsureInitialized(ref _location, delegate
+                LazyInitializer.EnsureInitialized(ref _path, delegate
                 {
                     string path;
 
@@ -60,10 +61,10 @@ namespace Scrutiny.Models
                         return string.Empty;
                     }
 
-                    return Path.Combine(Journal.RootDirectory.FullName, path.TrimStart('\\'));
+                    return System.IO.Path.Combine(Journal.RootDirectory.FullName, path.TrimStart('\\'));
                 });
 
-                return _location;
+                return _path;
             }
         }
 
@@ -74,7 +75,7 @@ namespace Scrutiny.Models
             {
                 if (!_fileInformation.HasValue)
                 {
-                    Journal.GetFileInformation(FilePath, out _fileInformation);
+                    Journal.GetFileInformation(PathAndName, out _fileInformation);
                 }
 
                 if (_fileInformation == null)
@@ -118,17 +119,17 @@ namespace Scrutiny.Models
            } 
         }
 
-        public string FilePath
+        public string PathAndName
         {
             get
             {
-                return Path.Combine(Location, UsnEntry.Name);
+                return System.IO.Path.Combine(Path, UsnEntry.Name);
             }
         }
 
         public override string ToString()
         {
-            return FilePath;
+            return PathAndName;
         }
 
         public int CompareTo(object obj)

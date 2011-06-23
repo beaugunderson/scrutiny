@@ -1,150 +1,185 @@
 ﻿<Window x:Class="Scrutiny.Windows.MainWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:Windows="clr-namespace:Scrutiny.Windows"
-        mc:Ignorable="d" Title="Synapse Search"
-        Height="350" 
-        Width="725"
-        ResizeMode="CanResizeWithGrip" 
-        Loaded="Window_Loaded"
-        Closing="Window_Closing">
-    <!--d:DataContext="{d:DesignInstance Windows:MainWindow}"-->
-    <Window.Resources>
-        <Style x:Key="StretchHeaderStyle" TargetType="{x:Type GridViewColumnHeader}">
-            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-            <Setter Property="Padding" Value="12,0,12,0"></Setter>
-        </Style>
+		xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+		xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+		xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+		xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+		xmlns:WPF="clr-namespace:Scrutiny.WPF"
+		mc:Ignorable="d"
+		Title="Scrutiny"
+		Height="350" 
+		Width="725"
+		ResizeMode="CanResizeWithGrip" 
+		Loaded="Window_Loaded"
+		Closing="Window_Closing">
+	<!--d:DataContext="{d:DesignInstance Windows:MainWindow}"-->
+	<Window.Resources>
+		<Style x:Key="StretchHeaderStyle" TargetType="{x:Type GridViewColumnHeader}">
+			<Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+			<Setter Property="Padding" Value="12,0,12,0"></Setter>
+		</Style>
 
-        <Style TargetType="{x:Type GridViewColumnHeader}">
-            <Setter Property="Padding" Value="12,0,12,0"></Setter>
-        </Style>
+		<Style TargetType="{x:Type GridViewColumnHeader}">
+			<Setter Property="Padding" Value="12,0,12,0"></Setter>
+		</Style>
 
-        <Style TargetType="{x:Type StatusBarItem}">
-            <Setter Property="Padding" Value="12,0,12,0"></Setter>
-        </Style>
+		<Style TargetType="{x:Type StatusBarItem}">
+			<Setter Property="Padding" Value="12,0,12,0"></Setter>
+		</Style>
 
-        <Style TargetType="{x:Type ListViewItem}">
-            <Setter Property="Padding" Value="0,1,0,1"></Setter>
-        </Style>
+		<Style TargetType="{x:Type ListViewItem}">
+			<Setter Property="Padding" Value="0,1,0,1"></Setter>
+		</Style>
 
-        <Windows:HighlightConverter x:Key="HighlightConverter" />
-    </Window.Resources>
+		<WPF:HighlightConverter x:Key="HighlightConverter" />
+		
+		<DataTemplate x:Key="AscendingTemplate">
+			<Grid>
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="*" />
+					<ColumnDefinition Width="15" />
+				</Grid.ColumnDefinitions>
+				
+				<TextBlock Grid.Column="0" Text="{Binding .}"></TextBlock>
+			
+				<Border Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Center">
+					<Path Name="Arrow" StrokeThickness="0.5" Fill="Gray" Stroke="Black" Data="M 0,5 L 8,5 L 4,1 L 1,4 Z" />
+				</Border>
+			</Grid>
+		</DataTemplate>
+		
+		<DataTemplate x:Key="DescendingTemplate">
+			<Grid>
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="*" />
+					<ColumnDefinition Width="12" />
+				</Grid.ColumnDefinitions>
+				
+				<TextBlock Grid.Column="0" Text="{Binding .}"></TextBlock>
+			
+				<Border Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Center">
+					<Path Name="Arrow" StrokeThickness="0.5" Fill="Gray" Stroke="Black" Data="M 0,1 L 4,5 L 8,1 L 0,1 Z" />
+				</Border>
+			</Grid>
+		</DataTemplate>
+	</Window.Resources>
 
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="*" />
-            <RowDefinition Height="30" />
-        </Grid.RowDefinitions>
+	<Grid>
+		<Grid.RowDefinitions>
+			<RowDefinition Height="*" />
+			<RowDefinition Height="30" />
+		</Grid.RowDefinitions>
 
-        <DockPanel>
-            <Menu IsMainMenu="True" DockPanel.Dock="Top">
-                <MenuItem Header="_File">
-                    <MenuItem Header="E_xit" IsCheckable="true" InputGestureText="Alt+F4" Name="ExitMenuItem" Click="ExitMenuItem_Click" />
-                </MenuItem>
+		<DockPanel>
+			<Menu IsMainMenu="True" DockPanel.Dock="Top">
+				<MenuItem Header="_File">
+					<MenuItem Header="E_xit" IsCheckable="true" InputGestureText="Alt+F4" Name="ExitMenuItem" Click="ExitMenuItem_Click" />
+				</MenuItem>
 
-                <MenuItem Header="_Edit">
-                    <MenuItem Header="_Undo" InputGestureText="Ctrl+Z" Command="Undo" />
-                    <MenuItem Header="_Redo" InputGestureText="Ctrl+Y" Command="Redo" />
-                    
-                    <Separator />
-                    
-                    <MenuItem Header="Cu_t" InputGestureText="Ctrl+X" Command="Cut" />
-                    <MenuItem Header="_Copy" InputGestureText="Ctrl+C" Command="Copy" />
-                    <MenuItem Header="_Paste" InputGestureText="Ctrl+V" Command="Paste" />
-                    <MenuItem Header="_Delete" InputGestureText="Del" Command="Delete" />
-                </MenuItem>
+				<MenuItem Header="_Edit">
+					<MenuItem Header="_Undo" InputGestureText="Ctrl+Z" Command="Undo" />
+					<MenuItem Header="_Redo" InputGestureText="Ctrl+Y" Command="Redo" />
+					
+					<Separator />
+					
+					<MenuItem Header="Cu_t" InputGestureText="Ctrl+X" Command="Cut" />
+					<MenuItem Header="_Copy" InputGestureText="Ctrl+C" Command="Copy" />
+					<MenuItem Header="_Paste" InputGestureText="Ctrl+V" Command="Paste" />
+					<MenuItem Header="_Delete" InputGestureText="Del" Command="Delete" />
+				</MenuItem>
 
-                <MenuItem Header="_Options">
-                    <MenuItem Header="Verbatim" IsCheckable="True" IsChecked="{Binding Path=Verbatim}" />
-                    <MenuItem Header="Case Sensitive" IsCheckable="True" IsChecked="{Binding Path=CaseSensitive}" />
-                    <MenuItem Header="Match Location" IsCheckable="True" IsChecked="{Binding Path=SearchInLocation}" />
-                    <MenuItem Header="Regular Expressions" IsCheckable="True" IsChecked="{Binding Path=RegularExpressions}" />
-                </MenuItem>
+				<MenuItem Header="_Options">
+					<MenuItem Header="Multiple Terms" IsCheckable="True" IsChecked="{Binding Path=IsMultipleTerms}" />
+					<MenuItem Header="Case Sensitive" IsCheckable="True" IsChecked="{Binding Path=IsCaseSensitive}" />
+					<MenuItem Header="Regular Expression" IsCheckable="True" IsChecked="{Binding Path=IsRegularExpression}" />
 
-                <MenuItem Header="_Help">
-                    <MenuItem Header="_About..." />
-                </MenuItem>
-            </Menu>
+					<Separator />
+					
+					<MenuItem Header="Search Name" IsCheckable="True" IsChecked="{Binding Path=SearchInName}" />
+					<MenuItem Header="Search Location" IsCheckable="True" IsChecked="{Binding Path=SearchInLocation}" />
+				</MenuItem>
 
-            <TextBox Height="23" Name="searchTextBox" DockPanel.Dock="Top" Text="{Binding Path=SearchTerm, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" TextChanged="searchTextBox_TextChanged" />
+				<MenuItem Header="_Help">
+					<MenuItem Header="_About..." />
+				</MenuItem>
+			</Menu>
 
-            <ListView Name="resultsListView"    
-                        VirtualizingStackPanel.IsVirtualizing="True"
-                        ItemsSource="{Binding Path=DisplaySearchResults}"
-                        SelectedItem="{Binding Path=CurrentResult, Mode=TwoWay}"
-                        SelectionChanged="resultsListView_SelectionChanged">
-                <ListView.ItemContainerStyle>
-                    <Style TargetType="ListViewItem">
-                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                    </Style>
-                </ListView.ItemContainerStyle>
+			<TextBox Height="23" Name="searchTextBox" DockPanel.Dock="Top" Text="{Binding Path=SearchTerm, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                <ListView.ContextMenu>
-                    <ContextMenu>
-                        <MenuItem Header="_Open Location" Click="OpenLocation_Click"></MenuItem>
-                    </ContextMenu>
-                </ListView.ContextMenu>
+			<ListView Name="resultsListView"    
+						VirtualizingStackPanel.IsVirtualizing="True"
+						ItemsSource="{Binding Path=DisplaySearchResults}"
+						SelectedItem="{Binding Path=CurrentResult, Mode=TwoWay}"
+						SelectionChanged="resultsListView_SelectionChanged">
+				<ListView.ItemContainerStyle>
+					<Style TargetType="ListViewItem">
+						<Setter Property="HorizontalContentAlignment" Value="Stretch" />
+					</Style>
+				</ListView.ItemContainerStyle>
 
-                <ListView.View>
-                    <GridView ColumnHeaderContainerStyle="{StaticResource StretchHeaderStyle}">
-                        <GridViewColumn Width="150">
-                            <GridViewColumn.CellTemplate>
-                                <DataTemplate>
-                                    <ContentControl>
-                                        <ContentControl.Content>
-                                            <MultiBinding Converter="{StaticResource HighlightConverter}">
-                                                <Binding Path="Name"/>
-                                                <Binding RelativeSource="{RelativeSource FindAncestor, AncestorType={x:Type Window}}" Path="SearchTerm" />
-                                            </MultiBinding>
-                                        </ContentControl.Content>
-                                    </ContentControl>
-                                </DataTemplate>
-                            </GridViewColumn.CellTemplate>
+				<ListView.ContextMenu>
+					<ContextMenu>
+						<MenuItem Header="_Open Location" Click="OpenLocation_Click"></MenuItem>
+					</ContextMenu>
+				</ListView.ContextMenu>
 
-                            <GridViewColumnHeader Name="Name" Click="GridViewColumnHeader_Click" Content="Name" />
-                        </GridViewColumn>
+				<ListView.View>
+					<GridView ColumnHeaderContainerStyle="{StaticResource StretchHeaderStyle}">
+						<GridViewColumn Width="150">
+							<GridViewColumn.CellTemplate>
+								<DataTemplate>
+									<ContentControl>
+										<ContentControl.Content>
+											<MultiBinding Converter="{StaticResource HighlightConverter}">
+												<Binding Path="Name"/>
+												<Binding RelativeSource="{RelativeSource FindAncestor, AncestorType={x:Type Window}}" Path="SearchTerm" />
+											</MultiBinding>
+										</ContentControl.Content>
+									</ContentControl>
+								</DataTemplate>
+							</GridViewColumn.CellTemplate>
 
-                        <GridViewColumn Width="350">
-                            <GridViewColumn.CellTemplate>
-                                <DataTemplate>
-                                    <ContentControl>
-                                        <ContentControl.Content>
-                                            <MultiBinding Converter="{StaticResource HighlightConverter}">
-                                                <Binding Path="Location"/>
-                                                <Binding RelativeSource="{RelativeSource FindAncestor, AncestorType={x:Type Window}}" Path="SearchTerm" />
-                                            </MultiBinding>
-                                        </ContentControl.Content>
-                                    </ContentControl>
-                                </DataTemplate>
-                            </GridViewColumn.CellTemplate>
+							<GridViewColumnHeader Name="FileName" Click="GridViewColumnHeader_Click" Content="Name" />
+						</GridViewColumn>
 
-                            <GridViewColumnHeader Name="Location" Click="GridViewColumnHeader_Click" Content="Location" />
-                        </GridViewColumn>
+						<GridViewColumn Width="350">
+							<GridViewColumn.CellTemplate>
+								<DataTemplate>
+									<ContentControl>
+										<ContentControl.Content>
+											<MultiBinding Converter="{StaticResource HighlightConverter}">
+												<Binding Path="Path"/>
+												<Binding RelativeSource="{RelativeSource FindAncestor, AncestorType={x:Type Window}}" Path="SearchTerm" />
+											</MultiBinding>
+										</ContentControl.Content>
+									</ContentControl>
+								</DataTemplate>
+							</GridViewColumn.CellTemplate>
 
-                        <GridViewColumn DisplayMemberBinding="{Binding Path=FormattedSize}" Width="50">
-                            <GridViewColumnHeader Name="Size" Click="GridViewColumnHeader_Click" Content="Size" />
-                        </GridViewColumn>
+							<GridViewColumnHeader Name="Location" Click="GridViewColumnHeader_Click" Content="Location" />
+						</GridViewColumn>
 
-                        <GridViewColumn DisplayMemberBinding="{Binding Path=LastModified}" Width="150">
-                            <GridViewColumnHeader Name="LastModified" Click="GridViewColumnHeader_Click" Content="Last Modified" />
-                        </GridViewColumn>
-                    </GridView>
-                </ListView.View>
-            </ListView>
-        </DockPanel>
+						<GridViewColumn DisplayMemberBinding="{Binding Path=FormattedSize}" Width="50">
+							<GridViewColumnHeader Name="Size" Click="GridViewColumnHeader_Click" Content="Size" />
+						</GridViewColumn>
 
-        <StatusBar Name="statusBar" Height="30" VerticalAlignment="Bottom" Grid.Row="1">
-            <TextBlock Name="statusTextBlock" Text="{Binding Path=RunningTasks, UpdateSourceTrigger=PropertyChanged}" />
+						<GridViewColumn DisplayMemberBinding="{Binding Path=LastModified}" Width="150">
+							<GridViewColumnHeader Name="LastModified" Click="GridViewColumnHeader_Click" Content="Last Modified" />
+						</GridViewColumn>
+					</GridView>
+				</ListView.View>
+			</ListView>
+		</DockPanel>
 
-            <Separator />
+		<StatusBar Name="statusBar" Height="30" VerticalAlignment="Bottom" Grid.Row="1">
+			<TextBlock Name="statusTextBlock" Text="{Binding Path=RunningTasks, UpdateSourceTrigger=PropertyChanged}" />
 
-            <TextBlock Text="{Binding Path=DisplaySearchResults.Count, StringFormat=\{0:N0\} results}"></TextBlock>
+			<Separator />
 
-            <Separator />
+			<TextBlock Text="{Binding Path=DisplaySearchResults.Count, StringFormat=\{0:N0\} results}"></TextBlock>
 
-            <TextBlock Text="{Binding Path=SearchResults.Count, StringFormat=\{0:N0\} total}"></TextBlock>
-        </StatusBar>
-    </Grid>
+			<Separator />
+
+			<TextBlock Text="{Binding Path=SearchResults.Count, StringFormat=\{0:N0\} total}"></TextBlock>
+		</StatusBar>
+	</Grid>
 </Window>
