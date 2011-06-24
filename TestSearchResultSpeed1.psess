@@ -1,0 +1,212 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<VSPerformanceSession Version="1.00">
+  <Options>
+    <Solution>C:\Users\beau\Desktop\git\scrutiny\Scrutiny.sln</Solution>
+    <CollectionMethod>Concurrency</CollectionMethod>
+    <AllocationMethod>Life</AllocationMethod>
+    <LaunchRuntimeControl>true</LaunchRuntimeControl>
+    <Reportname>C:\Users\beau\Desktop\git\scrutiny\Performance\TestSearchResultSpeed.vsp</Reportname>
+    <AddReport>true</AddReport>
+    <ResourceBasedAnalysisSelected>true</ResourceBasedAnalysisSelected>
+    <ThreadBasedAnalysisSelected>true</ThreadBasedAnalysisSelected>
+    <UniqueReport>Timestamp</UniqueReport>
+    <SamplingMethod>Cycles</SamplingMethod>
+    <CycleCount>1000000</CycleCount>
+    <PageFaultCount>10</PageFaultCount>
+    <SysCallCount>10</SysCallCount>
+    <SamplingCounter Name="InstructionsRetired" ReloadValue="00000000000f4240" DisplayName="Instructions Retired" />
+    <RelocateBinaries>false</RelocateBinaries>
+    <AdditionalArgruments />
+    <TargetCLRVersion>Automatic</TargetCLRVersion>
+    <CollectOnHpcCluster>false</CollectOnHpcCluster>
+    <HPCSettings>
+      <NumberOfProcesses>0</NumberOfProcesses>
+      <TargetSelection>UnknownDisabled</TargetSelection>
+      <ProfileOnRank>0</ProfileOnRank>
+      <AdvancedProperties>
+        <Project>TestSearchResultSpeed</Project>
+        <CleanUp>true</CleanUp>
+        <MpiexecCommand>mpiexec.exe</MpiexecCommand>
+        <DeployCRT>true</DeployCRT>
+      </AdvancedProperties>
+    </HPCSettings>
+    <HardwareCounters EnableHWCounters="false">
+      <HardwareCounter Name="L2Misses" ReloadValue="00000000000003e8" DisplayName="Last Level Cache Misses" />
+      <HardwareCounter Name="L2References" ReloadValue="00000000000003e8" DisplayName="Last Level Cache References" />
+      <HardwareCounter Name="L2InstructionFetches" ReloadValue="00000000000186a0" DisplayName="L2 Instruction Fetches" />
+      <HardwareCounter Name="L2DataLoads" ReloadValue="00000000000186a0" DisplayName="L2 Data Loads" />
+      <HardwareCounter Name="L2DataStores" ReloadValue="00000000000186a0" DisplayName="L2 Data Stores" />
+      <HardwareCounter Name="L2LinesIn" ReloadValue="00000000000186a0" DisplayName="L2 Lines In" />
+      <HardwareCounter Name="L2LinesOut" ReloadValue="00000000000186a0" DisplayName="L2 Lines Out" />
+      <HardwareCounter Name="L2ModifiedLinesIn" ReloadValue="00000000000186a0" DisplayName="L2 Modified Lines In" />
+      <HardwareCounter Name="L2ModifiedLinesOut" ReloadValue="00000000000186a0" DisplayName="L2 Modified Lines Out" />
+    </HardwareCounters>
+    <EtwSettings>
+      <Provider ControlGuid="06b94d9a-b15e-456e-a4ef-37c984a2cb4b" Enabled="false" Flags="000000fe" Level="5" />
+      <Provider ControlGuid="1fbecc45-c060-4e7c-8a0e-0dbd6116181b" Enabled="false" Flags="000000fe" Level="5" />
+      <Provider ControlGuid="3a2a4e84-4c21-4981-ae10-3fda0d9b0f83" Enabled="false" Flags="000000fe" Level="5" />
+      <Provider ControlGuid="9e814aad-3204-11d2-9a82-006008a86939" Enabled="false" Flags="00000000" Level="0" />
+      <Provider ControlGuid="a1c2040e-8840-4c31-ba11-9871031a19ea" Enabled="false" Flags="000000fe" Level="5" />
+      <Provider ControlGuid="aff081fe-0247-4275-9c4e-021f3dc1da35" Enabled="false" Flags="ffffffff" Level="5" />
+      <Provider ControlGuid="e13c0d23-ccbc-4e12-931b-d9cc2eee27e4" Enabled="false" Flags="7fffffff" Level="5" />
+    </EtwSettings>
+    <PdhSettings>
+      <PdhCountersEnabled>false</PdhCountersEnabled>
+      <PdhCountersRate>500</PdhCountersRate>
+      <PdhCounters>
+        <PdhCounter>\Memory\Pages/sec</PdhCounter>
+        <PdhCounter>\PhysicalDisk(_Total)\Avg. Disk Queue Length</PdhCounter>
+        <PdhCounter>\Processor(_Total)\% Processor Time</PdhCounter>
+      </PdhCounters>
+    </PdhSettings>
+  </Options>
+  <ExcludeSmallFuncs>false</ExcludeSmallFuncs>
+  <JScriptProfilingEnabled>false</JScriptProfilingEnabled>
+  <PreinstrumentEvent>
+    <InstrEventProgram />
+    <InstrEventArguments />
+    <InstrEventDescription />
+    <InstrEventExclude>false</InstrEventExclude>
+  </PreinstrumentEvent>
+  <PostinstrumentEvent>
+    <InstrEventProgram />
+    <InstrEventArguments />
+    <InstrEventDescription />
+    <InstrEventExclude>false</InstrEventExclude>
+  </PostinstrumentEvent>
+  <Binaries>
+    <TestBinary>
+      <Path>C:\Users\beau\Desktop\git\scrutiny\ScrutinyTests\obj\Debug\ScrutinyTests.dll</Path>
+      <AdditionalArgruments />
+      <TargetCLRVersion>Automatic</TargetCLRVersion>
+      <ArgumentTimestamp>06/23/2011 15:23:05</ArgumentTimestamp>
+      <Instrument>false</Instrument>
+      <Sample>true</Sample>
+      <ExternalWebsite>false</ExternalWebsite>
+      <InteractionProfilingEnabled>false</InteractionProfilingEnabled>
+      <IsLocalJavascript>false</IsLocalJavascript>
+      <LaunchProject>true</LaunchProject>
+      <OverrideProjectSettings>false</OverrideProjectSettings>
+      <LaunchMethod>Test</LaunchMethod>
+      <StartupDirectory>C:\Users\beau\Desktop\git\scrutiny\ScrutinyTests\bin\Debug\</StartupDirectory>
+      <Arguments />
+      <NetAppHost>IIS</NetAppHost>
+      <NetBrowser>InternetExplorer</NetBrowser>
+      <ExcludeSmallFuncs>false</ExcludeSmallFuncs>
+      <JScriptProfilingEnabled>false</JScriptProfilingEnabled>
+      <PreinstrumentEvent>
+        <InstrEventProgram />
+        <InstrEventArguments />
+        <InstrEventDescription />
+        <InstrEventExclude>false</InstrEventExclude>
+      </PreinstrumentEvent>
+      <PostinstrumentEvent>
+        <InstrEventProgram />
+        <InstrEventArguments />
+        <InstrEventDescription />
+        <InstrEventExclude>false</InstrEventExclude>
+      </PostinstrumentEvent>
+      <ProjRef>{823C6F07-758C-4226-83D6-E89872DDC04E}|ScrutinyTests\ScrutinyTests.csproj</ProjRef>
+      <ProjPath>C:\Users\beau\Desktop\git\scrutiny\ScrutinyTests\ScrutinyTests.csproj</ProjPath>
+      <ProjName>TestSearchResultSpeed</ProjName>
+      <TestId>{575f1327-63a2-7ff2-1bbb-cb84a5f1e051}</TestId>
+      <TestName>TestSearchResultSpeed</TestName>
+    </TestBinary>
+    <ProjBinary>
+      <Path>C:\Users\beau\Desktop\git\scrutiny\NTFS\obj\Debug\NTFS.dll</Path>
+      <AdditionalArgruments />
+      <TargetCLRVersion>Automatic</TargetCLRVersion>
+      <ArgumentTimestamp>06/23/2011 15:23:05</ArgumentTimestamp>
+      <Instrument>true</Instrument>
+      <Sample>true</Sample>
+      <ExternalWebsite>false</ExternalWebsite>
+      <InteractionProfilingEnabled>false</InteractionProfilingEnabled>
+      <IsLocalJavascript>false</IsLocalJavascript>
+      <LaunchProject>true</LaunchProject>
+      <OverrideProjectSettings>false</OverrideProjectSettings>
+      <LaunchMethod>Executable</LaunchMethod>
+      <StartupDirectory>C:\Users\beau\Desktop\git\scrutiny\NTFS\bin\Debug\</StartupDirectory>
+      <Arguments />
+      <NetAppHost>IIS</NetAppHost>
+      <NetBrowser>InternetExplorer</NetBrowser>
+      <ExcludeSmallFuncs>false</ExcludeSmallFuncs>
+      <JScriptProfilingEnabled>false</JScriptProfilingEnabled>
+      <PreinstrumentEvent>
+        <InstrEventProgram />
+        <InstrEventArguments />
+        <InstrEventDescription />
+        <InstrEventExclude>false</InstrEventExclude>
+      </PreinstrumentEvent>
+      <PostinstrumentEvent>
+        <InstrEventProgram />
+        <InstrEventArguments />
+        <InstrEventDescription />
+        <InstrEventExclude>false</InstrEventExclude>
+      </PostinstrumentEvent>
+      <ProjRef>{F34563A8-957E-45A9-A7D5-24BD7D8FBE7D}|NTFS\NTFS.csproj</ProjRef>
+      <ProjPath>C:\Users\beau\Desktop\git\scrutiny\NTFS\NTFS.csproj</ProjPath>
+      <ProjName>NTFS</ProjName>
+    </ProjBinary>
+    <ProjBinary>
+      <Path>C:\Users\beau\Desktop\git\scrutiny\Scrutiny\obj\x86\Debug\Scrutiny.exe</Path>
+      <AdditionalArgruments />
+      <TargetCLRVersion>Automatic</TargetCLRVersion>
+      <ArgumentTimestamp>06/23/2011 15:23:05</ArgumentTimestamp>
+      <Instrument>true</Instrument>
+      <Sample>true</Sample>
+      <ExternalWebsite>false</ExternalWebsite>
+      <InteractionProfilingEnabled>false</InteractionProfilingEnabled>
+      <IsLocalJavascript>false</IsLocalJavascript>
+      <LaunchProject>true</LaunchProject>
+      <OverrideProjectSettings>false</OverrideProjectSettings>
+      <LaunchMethod>Executable</LaunchMethod>
+      <ExecutablePath>C:\Users\beau\Desktop\git\scrutiny\Scrutiny\bin\Debug\Scrutiny.exe</ExecutablePath>
+      <StartupDirectory>C:\Users\beau\Desktop\git\scrutiny\Scrutiny\bin\Debug\</StartupDirectory>
+      <Arguments />
+      <NetAppHost>IIS</NetAppHost>
+      <NetBrowser>InternetExplorer</NetBrowser>
+      <ExcludeSmallFuncs>false</ExcludeSmallFuncs>
+      <JScriptProfilingEnabled>false</JScriptProfilingEnabled>
+      <PreinstrumentEvent>
+        <InstrEventProgram />
+        <InstrEventArguments />
+        <InstrEventDescription />
+        <InstrEventExclude>false</InstrEventExclude>
+      </PreinstrumentEvent>
+      <PostinstrumentEvent>
+        <InstrEventProgram />
+        <InstrEventArguments />
+        <InstrEventDescription />
+        <InstrEventExclude>false</InstrEventExclude>
+      </PostinstrumentEvent>
+      <ProjRef>{DDD9F565-6B6F-4B91-B483-09088822DA99}|Scrutiny\Scrutiny.csproj</ProjRef>
+      <ProjPath>C:\Users\beau\Desktop\git\scrutiny\Scrutiny\Scrutiny.csproj</ProjPath>
+      <ProjName>Scrutiny</ProjName>
+    </ProjBinary>
+  </Binaries>
+  <Reports>
+    <Report>
+      <Path>C:\Users\beau\Desktop\git\scrutiny\Performance\TestSearchResultSpeed110623.vsp</Path>
+    </Report>
+    <Report>
+      <Path>C:\Users\beau\Desktop\git\scrutiny\Performance\TestSearchResultSpeed110623(1).vsp</Path>
+    </Report>
+  </Reports>
+  <Launches>
+    <TestBinary>
+      <Path>:TB:{575f1327-63a2-7ff2-1bbb-cb84a5f1e051}:TestSearchResultSpeed:{823C6F07-758C-4226-83D6-E89872DDC04E}|ScrutinyTests\ScrutinyTests.csproj</Path>
+    </TestBinary>
+  </Launches>
+  <RuntimeMarks>
+    <MarkName>Mark One</MarkName>
+    <MarkName>Mark Two</MarkName>
+    <MarkName>Mark Three</MarkName>
+    <MarkName>Mark Four</MarkName>
+    <MarkName>Mark Five</MarkName>
+    <MarkName>Mark Six</MarkName>
+    <MarkName>Mark Seven</MarkName>
+    <MarkName>Mark Eight</MarkName>
+    <MarkName>Mark Nine</MarkName>
+    <MarkName>Mark Ten</MarkName>
+  </RuntimeMarks>
+</VSPerformanceSession>

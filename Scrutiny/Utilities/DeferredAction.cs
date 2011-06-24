@@ -4,7 +4,7 @@ using System.Windows;
 
 namespace Scrutiny.Utilities
 {
-    public class DeferredAction
+    public sealed class DeferredAction : IDisposable
     {
         private readonly Timer _timer;
 
@@ -28,6 +28,11 @@ namespace Scrutiny.Utilities
         {
             // Fire action when time elapses (with no subsequent calls).
             _timer.Change(delay, -1);
+        }
+
+        public void Dispose()
+        {
+            _timer.Dispose();
         }
     }
 }

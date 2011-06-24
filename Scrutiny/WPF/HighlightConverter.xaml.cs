@@ -20,7 +20,7 @@ namespace Scrutiny.WPF
     /// <returns>
     /// A <see cref="TextBlock"/> with Inlines collection filled with <see cref="Run"/> elements.
     /// </returns>
-    public class HighlightConverter : IMultiValueConverter
+    public class HighlightConverter : DependencyObject, IMultiValueConverter
     {
         private readonly ColorCombination[] _colorCombinations = new[]
         {
@@ -48,6 +48,21 @@ namespace Scrutiny.WPF
             {
                 Match = match;
                 ColorIndex = colorIndex;
+            }
+        }
+
+        public static readonly DependencyProperty IsCaseSensitiveProperty =
+            DependencyProperty.Register("IsCaseSensitive", typeof (bool), typeof (HighlightConverter), new PropertyMetadata(default(bool)));
+
+        public bool IsCaseSensitive
+        {
+            get
+            {
+                return (bool) GetValue(IsCaseSensitiveProperty);
+            }
+            set
+            {
+                SetValue(IsCaseSensitiveProperty, value);
             }
         }
 

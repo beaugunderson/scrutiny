@@ -1,17 +1,16 @@
 using System;
-using NTFS.PInvoke;
 
 namespace NTFS
 {
     public class NewUsnRecordEventArgs : EventArgs
     {
-        public Win32.UsnEntry UsnEntry
+        public NativeMethods.UsnEntry UsnEntry
         {
             get;
             set;
         }
 
-        public NewUsnRecordEventArgs(Win32.UsnEntry usnEntry)
+        public NewUsnRecordEventArgs(NativeMethods.UsnEntry usnEntry)
         {
             UsnEntry = usnEntry;
         }

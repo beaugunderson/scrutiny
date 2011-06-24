@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -11,9 +12,9 @@ using System.Windows.Controls;
 using System.Windows.Threading;
 
 using NTFS;
-using NTFS.PInvoke;
 
 using Scrutiny.Models;
+using Scrutiny.Properties;
 using Scrutiny.Utilities;
 using Scrutiny.WPF;
 
@@ -53,7 +54,6 @@ namespace Scrutiny.Windows
         private const string JournalCacheName = "Journal.cache";
 
         private bool _descending;
-        private bool _parallel = true;
 
         private readonly PropertyChangeNotifier _searchTermNotifier;
         private GridViewColumnHeader _lastColumnClicked;
@@ -361,7 +361,7 @@ namespace Scrutiny.Windows
                 var options = GetOptions();
                 var predicate = _predicates[options];
 
-                if (_parallel)
+                if (Settings.Default.Parallel)
                 {
                     list = SearchResults.AsParallel().Where(predicate);
                 }
@@ -453,11 +453,9 @@ namespace Scrutiny.Windows
 
         private void ScanDirectories(UsnJournal journal)
         {
-            List<Win32.UsnEntry> folders;
+            var folders = journal.GetNtfsVolumeFolders();
 
-            journal.GetNtfsVolumeFolders(out folders);
-
-            if (_parallel)
+            if (Settings.Default.Parallel)
             {
                 folders.AsParallel()
                     .ForAll(entry => SearchResults.Add(new SearchResult(entry, journal)));
@@ -473,18 +471,14 @@ namespace Scrutiny.Windows
 
         private void ScanFiles(UsnJournal journal)
         {
-            List<Win32.UsnEntry> files;
-
-            journal.GetFilesMatchingFilter("*", out files);
-
-            if (_parallel)
+            if (Settings.Default.Parallel)
             {
-                files.AsParallel()
+                journal.GetFilesMatchingFilter("*").AsParallel()
                     .ForAll(entry => SearchResults.Add(new SearchResult(entry, journal)));
             }
             else
             {
-                foreach (var file in files)
+                foreach (var file in journal.GetFilesMatchingFilter("*"))
                 {
                     SearchResults.Add(new SearchResult(file, journal));
                 }
@@ -516,7 +510,16 @@ namespace Scrutiny.Windows
         {
             var task = new DescriptiveTask(delegate
             {
-                SearchResults = ThreadSafeObservableCollection<SearchResult>.DeserializeFromList(Paths.CombineBaseDirectory(JournalCacheName), _uiSynchronizationContext);
+                try
+                {
+                    SearchResults =
+                        ThreadSafeObservableCollection<SearchResult>.DeserializeFromList(
+                            Paths.CombineBaseDirectory(JournalCacheName), _uiSynchronizationContext);
+                }
+                catch (SerializationException se)
+                {
+                    Console.WriteLine("Unable to deserialize the cache.");
+                }
             },
             _tokenSource.Token,
             "Loading cache");
@@ -527,6 +530,7 @@ namespace Scrutiny.Windows
 
                 AddTask(delegate
                 {
+                    // XXX: Use ContinueWith here?
                     task.Wait();
 
                     if (SearchResults.Count == 0)

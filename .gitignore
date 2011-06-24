@@ -1,3 +1,9 @@
 /*.6.0.ReSharper.user
 /*.sln.docstates
 /*.suo
+/TestResults/
+/*.vsp
+/*.krn.etl
+/*.krn.ctl
+/*.app.ctl
+/*.sdf

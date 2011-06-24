@@ -4,7 +4,6 @@ using System.IO;
 using System.Threading;
 
 using NTFS;
-using NTFS.PInvoke;
 
 using Scrutiny.Utilities;
 using Scrutiny.Extensions;
@@ -19,15 +18,15 @@ namespace Scrutiny.Models
 
         private readonly string _driveName;
 
-        public SearchResult(Win32.UsnEntry usnEntry, UsnJournal journal)
+        public SearchResult(NativeMethods.UsnEntry usnEntry, UsnJournal journal)
         {
             UsnEntry = usnEntry;
 
             _journal = journal;
-            _driveName = journal.RootDirectory.FullName;
+            _driveName = journal.VolumeName;
         }
 
-        public Win32.UsnEntry UsnEntry
+        public NativeMethods.UsnEntry UsnEntry
         {
             get;
             set;
@@ -52,11 +51,9 @@ namespace Scrutiny.Models
             {
                 LazyInitializer.EnsureInitialized(ref _path, delegate
                 {
-                    string path;
+                    string path = Journal.GetPathFromFileReference(UsnEntry.ParentFileReferenceNumber);
 
-                    var result = Journal.GetPathFromFileReference(UsnEntry.ParentFileReferenceNumber, out path);
-
-                    if (result != UsnJournal.UsnJournalReturnCode.USN_JOURNAL_SUCCESS)
+                    if (path == null)
                     {
                         return string.Empty;
                     }
@@ -68,20 +65,24 @@ namespace Scrutiny.Models
             }
         }
 
-        private Win32.BY_HANDLE_FILE_INFORMATION? _fileInformation;
-        public Win32.BY_HANDLE_FILE_INFORMATION FileInformation
+        private NativeMethods.BY_HANDLE_FILE_INFORMATION? _fileInformation;
+        public NativeMethods.BY_HANDLE_FILE_INFORMATION FileInformation
         {
             get
             {
-                if (!_fileInformation.HasValue)
+                //LazyInitializer.EnsureInitialized(ref _fileInformation, delegate
+                //{
+                NativeMethods.BY_HANDLE_FILE_INFORMATION? fileInformation;
+
+                Journal.GetFileInformation(PathAndName, out fileInformation);
+
+                if (!fileInformation.HasValue)
                 {
-                    Journal.GetFileInformation(PathAndName, out _fileInformation);
+                    throw new ApplicationException("Failed to get file information");
                 }
 
-                if (_fileInformation == null)
-                {
-                    throw new Exception("Failed to get file information");
-                }
+                _fileInformation = fileInformation.Value;
+                //});
 
                 return _fileInformation.Value;
             }
@@ -107,7 +108,7 @@ namespace Scrutiny.Models
         {
             get
             {
-                return Win32.FiletimeToDateTime(FileInformation.LastWriteTime);
+                return NativeMethods.FiletimeToDateTime(FileInformation.LastWriteTime);
             }
         }
 

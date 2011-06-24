@@ -2,9 +2,9 @@
 using System.IO;
 using System.Runtime.InteropServices;
 
-namespace NTFS.PInvoke
+namespace NTFS
 {
-    public static class Win32
+    public static class NativeMethods
     {
         public enum GetLastErrorEnum
         {
@@ -141,7 +141,7 @@ namespace NTFS.PInvoke
         /// <param name="dwFlagsAndAttributes">File or device attributes and flags (typically FILE_ATTRIBUTE_NORMAL)</param>
         /// <param name="hTemplateFile">IntPtr to a valid handle to a template file with 'GENERIC_READ' access right</param>
         /// <returns>IntPtr handle to the 'lpFileName' file or device or 'INVALID_HANDLE_VALUE'</returns>
-        [DllImport("kernel32.dll", SetLastError = true)]
+        [DllImport("kernel32.dll", SetLastError=true, CharSet=CharSet.Unicode)]
         public static extern IntPtr
             CreateFile(string lpFileName,
             uint dwDesiredAccess,
@@ -180,11 +180,11 @@ namespace NTFS.PInvoke
         /// </summary>
         /// <param name="fileName">Fully qualified path to the file to delete</param>
         /// <returns>'true' if successful, otherwise 'false'</returns>
-        [DllImport("kernel32.dll", SetLastError = true)]
+        [DllImport("kernel32.dll", SetLastError = true, CharSet=CharSet.Unicode)]
         [return: MarshalAs(UnmanagedType.Bool)]
-        public static extern bool DeleteFile(
-            string fileName);
+        public static extern bool DeleteFile(string fileName);
 
+/*
         /// <summary>
         /// Read data from the file specified by 'hFile'.
         /// </summary>
@@ -202,7 +202,9 @@ namespace NTFS.PInvoke
             uint nNumberOfBytesToRead,
             out uint lpNumberOfBytesRead,
             IntPtr lpOverlapped);
+*/
 
+/*
         /// <summary>
         /// Writes the 
         /// </summary>
@@ -220,7 +222,9 @@ namespace NTFS.PInvoke
             uint nNumberOfBytesToWrite,
             out uint lpNumberOfBytesWritten,
             int overlapped);
+*/
 
+/*
         /// <summary>
         /// Writes the data in 'lpBuffer' to the file specified by 'hFile'.
         /// </summary>
@@ -238,6 +242,7 @@ namespace NTFS.PInvoke
             uint nNumberOfBytesToWrite,
             out uint lpNumberOfBytesWritten,
             int overlapped);
+*/
 
         /// <summary>
         /// Sends the 'dwIoControlCode' to the device specified by 'hDevice'.
@@ -348,7 +353,8 @@ namespace NTFS.PInvoke
         {
             long fileTimeLong = (((long)fileTime.HighDateTime) << 32) | fileTime.LowDateTime;
 
-            return DateTime.FromFileTimeUtc(fileTimeLong);
+            // XXX: FromFileTimeUTC returns a UTC DateTime which is less useful
+            return DateTime.FromFileTime(fileTimeLong);
         }
 
         public static FILETIME DateTimeToFiletime(DateTime time)
@@ -518,21 +524,21 @@ namespace NTFS.PInvoke
             /// <summary>
             /// USN Record Constructor
             /// </summary>
-            /// <param name="ptrToUsnRecord">Buffer pointer to first byte of the USN Record</param>
-            public UsnEntry(IntPtr ptrToUsnRecord)
+            /// <param name="usnEntryPointer">Buffer pointer to first byte of the USN Record</param>
+            public UsnEntry(IntPtr usnEntryPointer)
             {
-                RecordLength = (UInt32)Marshal.ReadInt32(ptrToUsnRecord);
-                FileReferenceNumber = (UInt64)Marshal.ReadInt64(ptrToUsnRecord, FR_OFFSET);
-                ParentFileReferenceNumber = (UInt64)Marshal.ReadInt64(ptrToUsnRecord, PFR_OFFSET);
-                USN = Marshal.ReadInt64(ptrToUsnRecord, USN_OFFSET);
-                Reason = (UInt32)Marshal.ReadInt32(ptrToUsnRecord, REASON_OFFSET);
+                RecordLength = (UInt32)Marshal.ReadInt32(usnEntryPointer);
+                FileReferenceNumber = (UInt64)Marshal.ReadInt64(usnEntryPointer, FR_OFFSET);
+                ParentFileReferenceNumber = (UInt64)Marshal.ReadInt64(usnEntryPointer, PFR_OFFSET);
+                USN = Marshal.ReadInt64(usnEntryPointer, USN_OFFSET);
+                Reason = (UInt32)Marshal.ReadInt32(usnEntryPointer, REASON_OFFSET);
 
-                _fileAttributes = (UInt32)Marshal.ReadInt32(ptrToUsnRecord, FA_OFFSET);
+                _fileAttributes = (UInt32)Marshal.ReadInt32(usnEntryPointer, FA_OFFSET);
 
-                short fileNameLength = Marshal.ReadInt16(ptrToUsnRecord, FNL_OFFSET);
-                short fileNameOffset = Marshal.ReadInt16(ptrToUsnRecord, FN_OFFSET);
+                short fileNameLength = Marshal.ReadInt16(usnEntryPointer, FNL_OFFSET);
+                short fileNameOffset = Marshal.ReadInt16(usnEntryPointer, FN_OFFSET);
                 
-                Name = Marshal.PtrToStringUni(new IntPtr(ptrToUsnRecord.ToInt32() + fileNameOffset), fileNameLength / sizeof(char));
+                Name = Marshal.PtrToStringUni(new IntPtr(usnEntryPointer.ToInt32() + fileNameOffset), fileNameLength / sizeof(char));
             }
 
             #region IComparable<UsnEntry> Members
@@ -549,29 +555,6 @@ namespace NTFS.PInvoke
         /// Contains the Start USN(64bits), Reason Mask(32bits), Return Only on Close flag(32bits),
         /// Time Out(64bits), Bytes To Wait For(64bits), and USN Journal ID(64bits).
         /// </summary>
-        /// <remarks> possible reason bits are from Win32
-        /// USN_REASON_DATA_OVERWRITE
-        /// USN_REASON_DATA_EXTEND
-        /// USN_REASON_DATA_TRUNCATION
-        /// USN_REASON_NAMED_DATA_OVERWRITE
-        /// USN_REASON_NAMED_DATA_EXTEND
-        /// USN_REASON_NAMED_DATA_TRUNCATION
-        /// USN_REASON_FILE_CREATE
-        /// USN_REASON_FILE_DELETE
-        /// USN_REASON_EA_CHANGE
-        /// USN_REASON_SECURITY_CHANGE
-        /// USN_REASON_RENAME_OLD_NAME
-        /// USN_REASON_RENAME_NEW_NAME
-        /// USN_REASON_INDEXABLE_CHANGE
-        /// USN_REASON_BASIC_INFO_CHANGE
-        /// USN_REASON_HARD_LINK_CHANGE
-        /// USN_REASON_COMPRESSION_CHANGE
-        /// USN_REASON_ENCRYPTION_CHANGE
-        /// USN_REASON_OBJECT_ID_CHANGE
-        /// USN_REASON_REPARSE_POINT_CHANGE
-        /// USN_REASON_STREAM_CHANGE
-        /// USN_REASON_CLOSE
-        /// </remarks>
         [StructLayout(LayoutKind.Sequential, Pack = 1)]
         public struct READ_USN_JOURNAL_DATA
         {
