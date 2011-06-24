@@ -1,9 +1,11 @@
 ﻿using System;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Security;
 
 namespace NTFS
 {
+    [SuppressUnmanagedCodeSecurityAttribute]
     public static class NativeMethods
     {
         public enum GetLastErrorEnum

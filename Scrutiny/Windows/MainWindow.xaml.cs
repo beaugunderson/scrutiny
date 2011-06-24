@@ -453,19 +453,18 @@ namespace Scrutiny.Windows
 
         private void ScanDirectories(UsnJournal journal)
         {
-            var folders = journal.GetNtfsVolumeFolders();
-
             if (Settings.Default.Parallel)
             {
-                folders.AsParallel()
+                journal.GetNtfsVolumeFolders()
+                    .AsParallel()
+                    .WithDegreeOfParallelism(10)
                     .ForAll(entry => SearchResults.Add(new SearchResult(entry, journal)));
             }
             else
             {
-                foreach (var folder in folders)
-                {
-                    SearchResults.Add(new SearchResult(folder, journal));
-                }
+                journal.GetNtfsVolumeFolders()
+                    .ToList()
+                    .ForEach(entry => SearchResults.Add(new SearchResult(entry, journal)));
             }
         }
 
@@ -473,15 +472,16 @@ namespace Scrutiny.Windows
         {
             if (Settings.Default.Parallel)
             {
-                journal.GetFilesMatchingFilter("*").AsParallel()
+                journal.GetFilesMatchingFilter("*")
+                    .AsParallel()
+                    .WithDegreeOfParallelism(10)
                     .ForAll(entry => SearchResults.Add(new SearchResult(entry, journal)));
             }
             else
             {
-                foreach (var file in journal.GetFilesMatchingFilter("*"))
-                {
-                    SearchResults.Add(new SearchResult(file, journal));
-                }
+                journal.GetFilesMatchingFilter("*")
+                    .ToList()
+                    .ForEach(entry => SearchResults.Add(new SearchResult(entry, journal)));
             }
         }
 
