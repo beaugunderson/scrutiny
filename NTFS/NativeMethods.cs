@@ -4,6 +4,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Security;
 using System.Text;
+
 using Microsoft.Win32.SafeHandles;
 
 namespace NTFS
@@ -11,44 +12,6 @@ namespace NTFS
     [SuppressUnmanagedCodeSecurityAttribute]
     public static class NativeMethods
     {
-        public enum GetLastErrorEnum
-        {
-            INVALID_HANDLE_VALUE = -1,
-            ERROR_SUCCESS = 0,
-            ERROR_INVALID_FUNCTION = 1,
-            ERROR_FILE_NOT_FOUND = 2,
-            ERROR_PATH_NOT_FOUND = 3,
-            ERROR_TOO_MANY_OPEN_FILES = 4,
-            ERROR_ACCESS_DENIED = 5,
-            ERROR_INVALID_HANDLE = 6,
-            ERROR_INVALID_DATA = 13,
-            ERROR_HANDLE_EOF = 38,
-            ERROR_NOT_SUPPORTED = 50,
-            ERROR_INVALID_PARAMETER = 87,
-            ERROR_JOURNAL_DELETE_IN_PROGRESS = 1178,
-            ERROR_JOURNAL_NOT_ACTIVE = 1179,
-            ERROR_JOURNAL_ENTRY_DELETED = 1181,
-            ERROR_INVALID_USER_BUFFER = 1784
-        }
-
-        public enum FILE_INFO_BY_HANDLE_CLASS {
-            FileBasicInfo = 0,
-            FileStandardInfo = 1,
-            FileNameInfo = 2,
-            FileRenameInfo = 3,
-            FileDispositionInfo = 4,
-            FileAllocationInfo = 5,
-            FileEndOfFileInfo = 6,
-            FileStreamInfo = 7,
-            FileCompressionInfo = 8,
-            FileAttributeTagInfo = 9,
-            FileIdBothDirectoryInfo = 10,  // 0xA
-            FileIdBothDirectoryRestartInfo = 11,  // 0xB
-            FileIoPriorityHintInfo = 12,  // 0xC
-            FileRemoteProtocolInfo = 13,  // 0xD
-            MaximumFileInfoByHandlesClass = 14   // 0xE
-        }
-
         public const Int32 INVALID_HANDLE_VALUE = -1;
 
         public const UInt32 GENERIC_READ = 0x80000000;
@@ -70,6 +33,8 @@ namespace NTFS
         public const UInt32 OBJ_CASE_INSENSITIVE = 0x40;
 
         private const UInt32 FILE_DEVICE_FILE_SYSTEM = 0x00000009;
+
+        public const int CREATION_DISPOSITION_OPEN_EXISTING = 3;
         
         private const UInt32 METHOD_NEITHER = 3;
         private const UInt32 METHOD_BUFFERED = 0;
@@ -113,7 +78,7 @@ namespace NTFS
         public static extern bool 
             GetFileInformationByHandleEx(
                 IntPtr hFile,
-                FILE_INFO_BY_HANDLE_CLASS fileInformationClass,
+                Enums.FILE_INFO_BY_HANDLE_CLASS fileInformationClass,
                 IntPtr fileInfo,
                 uint dwBufferSize);
 
@@ -187,9 +152,6 @@ namespace NTFS
                 IntPtr eaBuffer,
                 uint eaLength);
 
-        private const int CREATION_DISPOSITION_OPEN_EXISTING = 3;
-
-        // http://msdn.microsoft.com/en-us/library/aa364962%28VS.85%29.aspx
         [DllImport("kernel32.dll", EntryPoint = "GetFinalPathNameByHandleW", CharSet = CharSet.Unicode, SetLastError = true)]
         public static extern int GetFinalPathNameByHandle(
             IntPtr handle, 
@@ -197,7 +159,6 @@ namespace NTFS
             int bufLen, 
             int flags);
 
-        // http://msdn.microsoft.com/en-us/library/aa363858(VS.85).aspx
         [DllImport("kernel32.dll", EntryPoint = "CreateFileW", CharSet = CharSet.Unicode, SetLastError = true)]
         public static extern SafeFileHandle 
             NtCreateFile(
@@ -208,31 +169,5 @@ namespace NTFS
                 int dwCreationDisposition, 
                 uint dwFlagsAndAttributes, 
                 IntPtr hTemplateFile);
-
-        public static string GetSymbolicLinkTarget(DirectoryInfo symlink)
-        {
-            var directoryHandle = NtCreateFile(symlink.FullName, 0, 2, IntPtr.Zero,
-                                               CREATION_DISPOSITION_OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS,
-                                               IntPtr.Zero);
-
-            if (directoryHandle.IsInvalid)
-            {
-                throw new Win32Exception(Marshal.GetLastWin32Error());
-            }
-
-            var path = new StringBuilder(512);
-            
-            int size = GetFinalPathNameByHandle(directoryHandle.DangerousGetHandle(), path, path.Capacity, 0);
-            
-            if (size < 0)
-                throw new Win32Exception(Marshal.GetLastWin32Error());
-            
-            // The remarks section of GetFinalPathNameByHandle mentions the return being prefixed with "\\?\"
-            // More information about "\\?\" here -> http://msdn.microsoft.com/en-us/library/aa365247(v=VS.85).aspx
-            if (path[0] == '\\' && path[1] == '\\' && path[2] == '?' && path[3] == '\\')
-                return path.ToString().Substring(4);
-            
-            return path.ToString();
-        }
     }
 }
