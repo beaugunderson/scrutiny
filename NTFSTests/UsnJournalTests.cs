@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Diagnostics;
 using System.IO;
 
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -45,8 +46,14 @@ namespace NTFSTests
         {
             Types.BY_HANDLE_FILE_INFORMATION? fileInformation;
 
+            var path = Path.Combine(Environment.GetEnvironmentVariable("TEMP"), "Test.txt");
+
+            var fileStream = File.Create(path);
+
+            fileStream.Close();
+
             // TODO: Create the file ourselves
-            int result = _journal.GetFileInformation(@"C:\Test.txt", out fileInformation);
+            int result = _journal.GetFileInformation(path, out fileInformation);
 
             Assert.IsTrue(result == 0);
 

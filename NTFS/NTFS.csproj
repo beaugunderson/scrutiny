@@ -71,6 +71,7 @@
     <Compile Include="Enums.cs" />
     <Compile Include="Extensions\DateTimeExtensions.cs" />
     <Compile Include="Extensions\FileTimeExtensions.cs" />
+    <Compile Include="Extensions\ParallelExtensions.cs" />
     <Compile Include="NewUsnRecordEventArgs.cs" />
     <Compile Include="Types.cs" />
     <Compile Include="UsnJournal.cs" />

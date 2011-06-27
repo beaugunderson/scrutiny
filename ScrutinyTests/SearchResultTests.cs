@@ -2,9 +2,11 @@
 using System.IO;
 using System.Linq;
 using System.Threading;
+
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 using NTFS;
+using NTFS.Extensions;
 
 using Scrutiny.Models;
 using Scrutiny.WPF;
@@ -61,15 +63,53 @@ namespace ScrutinyTests
         }
 
         [TestMethod]
+        public void TestSequentialQuicksort()
+        {
+            var context = new SynchronizationContext();
+            var searchResults = new ThreadSafeObservableCollection<SearchResult>(synchronizationContext: context);
+
+            TestContext.BeginTimer("Reading journal");
+
+            var array = _journal.GetFilesMatchingFilter("*").ToArray();
+            
+            TestContext.EndTimer("Reading journal");
+
+            TestContext.BeginTimer("Sequential quicksort");
+
+            array.SequentialQuickSort();
+
+            TestContext.EndTimer("Sequential quicksort");
+        }
+
+        [TestMethod]
+        public void TestParallelQuicksort()
+        {
+            var context = new SynchronizationContext();
+            var searchResults = new ThreadSafeObservableCollection<SearchResult>(synchronizationContext: context);
+
+            TestContext.BeginTimer("Reading journal");
+
+            var array = _journal.GetFilesMatchingFilter("*").ToArray();
+            
+            TestContext.EndTimer("Reading journal");
+
+            TestContext.BeginTimer("Parallel quicksort");
+
+            array.ParallelQuickSort();
+
+            TestContext.EndTimer("Parallel quicksort");
+        }
+
+        [TestMethod]
         public void TestDefaultSearchResultSpeedParallel()
         {
             TestSearchResultSpeed();
         }
 
         [TestMethod]
-        public void TestTenThreadSearchResultSpeedParallel()
+        public void TestTwoThreadSearchResultSpeedParallel()
         {
-            TestSearchResultSpeed(10);
+            TestSearchResultSpeed(2);
         }
 
         [Ignore]
@@ -88,8 +128,8 @@ namespace ScrutinyTests
 
             TestContext.EndTimer("Reading journal");
 
-            // Sleep to allow the threads to finish
-            Thread.Sleep(1000);
+            // XXX: Sleep to allow the threads to finish
+            Thread.Sleep(5000);
 
             Assert.AreEqual(1000, searchResults.Count);
 

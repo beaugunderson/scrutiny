@@ -50,5 +50,43 @@
             USN_REASON_STREAM_CHANGE = 0x00200000,
             USN_REASON_CLOSE = 0x80000000
         }
+
+        public enum GetLastErrorEnum
+        {
+            INVALID_HANDLE_VALUE = -1,
+            ERROR_SUCCESS = 0,
+            ERROR_INVALID_FUNCTION = 1,
+            ERROR_FILE_NOT_FOUND = 2,
+            ERROR_PATH_NOT_FOUND = 3,
+            ERROR_TOO_MANY_OPEN_FILES = 4,
+            ERROR_ACCESS_DENIED = 5,
+            ERROR_INVALID_HANDLE = 6,
+            ERROR_INVALID_DATA = 13,
+            ERROR_HANDLE_EOF = 38,
+            ERROR_NOT_SUPPORTED = 50,
+            ERROR_INVALID_PARAMETER = 87,
+            ERROR_JOURNAL_DELETE_IN_PROGRESS = 1178,
+            ERROR_JOURNAL_NOT_ACTIVE = 1179,
+            ERROR_JOURNAL_ENTRY_DELETED = 1181,
+            ERROR_INVALID_USER_BUFFER = 1784
+        }
+
+        public enum FILE_INFO_BY_HANDLE_CLASS {
+            FileBasicInfo = 0,
+            FileStandardInfo = 1,
+            FileNameInfo = 2,
+            FileRenameInfo = 3,
+            FileDispositionInfo = 4,
+            FileAllocationInfo = 5,
+            FileEndOfFileInfo = 6,
+            FileStreamInfo = 7,
+            FileCompressionInfo = 8,
+            FileAttributeTagInfo = 9,
+            FileIdBothDirectoryInfo = 10,  // 0xA
+            FileIdBothDirectoryRestartInfo = 11,  // 0xB
+            FileIoPriorityHintInfo = 12,  // 0xC
+            FileRemoteProtocolInfo = 13,  // 0xD
+            MaximumFileInfoByHandlesClass = 14   // 0xE
+        }
     }
 }
