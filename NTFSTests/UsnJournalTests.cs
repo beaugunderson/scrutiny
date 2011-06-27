@@ -4,6 +4,7 @@ using System.IO;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 using NTFS;
+using NTFS.Extensions;
 
 namespace NTFSTests
 {
@@ -21,9 +22,28 @@ namespace NTFSTests
         }
 
         [TestMethod]
+        public void TestUsnJournalRecord()
+        {
+            int count = 0;
+
+            foreach (var record in _journal.TestGetFiles())
+            {
+                if (count > 25)
+                {
+                    return;
+                }
+
+                Trace.WriteLine(string.Format("Name: {0}", record.Name));
+                Trace.WriteLine(string.Format("FRN: {0}", record.UsnRecord.FileReferenceNumber));
+
+                count++;
+            }
+        }
+
+        [TestMethod]
         public void TestGetFileInformation()
         {
-            NativeMethods.BY_HANDLE_FILE_INFORMATION? fileInformation;
+            Types.BY_HANDLE_FILE_INFORMATION? fileInformation;
 
             // TODO: Create the file ourselves
             int result = _journal.GetFileInformation(@"C:\Test.txt", out fileInformation);
@@ -32,8 +52,8 @@ namespace NTFSTests
 
             Assert.IsNotNull(fileInformation);
 
-            Trace.WriteLine(NativeMethods.FiletimeToDateTime(fileInformation.Value.LastAccessTime));
-            Trace.WriteLine(NativeMethods.FiletimeToDateTime(fileInformation.Value.LastWriteTime));
+            Trace.WriteLine(fileInformation.Value.LastAccessTime.ToDateTime());
+            Trace.WriteLine(fileInformation.Value.LastWriteTime.ToDateTime());
         }
 
         [TestMethod]
@@ -43,20 +63,19 @@ namespace NTFSTests
 
             foreach (var usnEntry in _journal.GetFilesMatchingFilter("*"))
             {
-                if (count > 5)
+                if (count > 25)
                 {
                     return;
                 }
 
                 Assert.IsNotNull(usnEntry);
 
-                Trace.WriteLine(usnEntry.ParentFileReferenceNumber);
+                Trace.WriteLine(usnEntry.UsnRecord.ParentFileReferenceNumber);
 
-                string path = _journal.GetPathFromFileReference(usnEntry.ParentFileReferenceNumber);
+                string path = _journal.GetPathFromFileReference(usnEntry.UsnRecord.ParentFileReferenceNumber);
 
-                Assert.IsNotNull(path);
-
-                Trace.WriteLine(path);
+                Trace.WriteLine(string.Format("Path: {0}", path));
+                Trace.WriteLine(string.Format("FRN: {0}", usnEntry.UsnRecord.FileReferenceNumber));
 
                 count++;
             }

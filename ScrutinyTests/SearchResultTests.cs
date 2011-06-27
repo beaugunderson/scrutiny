@@ -37,7 +37,7 @@ namespace ScrutinyTests
 
             foreach (var usnEntry in _journal.GetFilesMatchingFilter("*"))
             {
-                if (count > 5)
+                if (count > 25)
                 {
                     return;
                 }
@@ -87,6 +87,11 @@ namespace ScrutinyTests
                 .ForAll(entry => searchResults.Add(new SearchResult(entry, _journal)));
 
             TestContext.EndTimer("Reading journal");
+
+            // Sleep to allow the threads to finish
+            Thread.Sleep(1000);
+
+            Assert.AreEqual(1000, searchResults.Count);
 
             Trace.WriteLine(string.Format("Read and added {0} objects.", searchResults.Count));
         }

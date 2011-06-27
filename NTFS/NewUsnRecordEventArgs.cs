@@ -4,15 +4,15 @@ namespace NTFS
 {
     public class NewUsnRecordEventArgs : EventArgs
     {
-        public NativeMethods.UsnEntry UsnEntry
+        public UsnJournalEntry UsnJournalEntry
         {
             get;
             set;
         }
 
-        public NewUsnRecordEventArgs(NativeMethods.UsnEntry usnEntry)
+        public NewUsnRecordEventArgs(UsnJournalEntry usnEntry)
         {
-            UsnEntry = usnEntry;
+            UsnJournalEntry = usnEntry;
         }
     }
 }

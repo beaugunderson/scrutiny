@@ -5,7 +5,7 @@ namespace NTFS
     [Serializable]
     public class UsnJournalException : Exception
     {
-        public UsnJournalException(UsnJournal.UsnJournalReturnCode volumeNotNtfs)
+        public UsnJournalException(Enums.UsnJournalReturnCode returnCode)
         {
         }
     }

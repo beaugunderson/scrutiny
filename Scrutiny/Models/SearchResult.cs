@@ -4,6 +4,7 @@ using System.IO;
 using System.Threading;
 
 using NTFS;
+using NTFS.Extensions;
 
 using Scrutiny.Utilities;
 using Scrutiny.Extensions;
@@ -18,15 +19,15 @@ namespace Scrutiny.Models
 
         private readonly string _driveName;
 
-        public SearchResult(NativeMethods.UsnEntry usnEntry, UsnJournal journal)
+        public SearchResult(UsnJournalEntry usnEntry, UsnJournal journal)
         {
-            UsnEntry = usnEntry;
+            UsnJournalEntry = usnEntry;
 
             _journal = journal;
             _driveName = journal.VolumeName;
         }
 
-        public NativeMethods.UsnEntry UsnEntry
+        public UsnJournalEntry UsnJournalEntry
         {
             get;
             set;
@@ -51,28 +52,28 @@ namespace Scrutiny.Models
             {
                 LazyInitializer.EnsureInitialized(ref _path, delegate
                 {
-                    string path = Journal.GetPathFromFileReference(UsnEntry.ParentFileReferenceNumber);
+                    string path = Journal.GetPathFromFileReference(UsnJournalEntry.UsnRecord.ParentFileReferenceNumber);
 
                     if (path == null)
                     {
                         return string.Empty;
                     }
 
-                    return System.IO.Path.Combine(Journal.RootDirectory.FullName, path.TrimStart('\\'));
+                    return System.IO.Path.Combine(Journal.VolumeName, path.TrimStart('\\'));
                 });
 
                 return _path;
             }
         }
 
-        private NativeMethods.BY_HANDLE_FILE_INFORMATION? _fileInformation;
-        public NativeMethods.BY_HANDLE_FILE_INFORMATION FileInformation
+        private Types.BY_HANDLE_FILE_INFORMATION? _fileInformation;
+        public Types.BY_HANDLE_FILE_INFORMATION FileInformation
         {
             get
             {
                 //LazyInitializer.EnsureInitialized(ref _fileInformation, delegate
                 //{
-                NativeMethods.BY_HANDLE_FILE_INFORMATION? fileInformation;
+                Types.BY_HANDLE_FILE_INFORMATION? fileInformation;
 
                 Journal.GetFileInformation(PathAndName, out fileInformation);
 
@@ -108,7 +109,7 @@ namespace Scrutiny.Models
         {
             get
             {
-                return NativeMethods.FiletimeToDateTime(FileInformation.LastWriteTime);
+                return FileInformation.LastWriteTime.ToDateTime();
             }
         }
 
@@ -116,7 +117,7 @@ namespace Scrutiny.Models
         {
            get
            {
-               return UsnEntry.Name;
+               return UsnJournalEntry.Name;
            } 
         }
 
@@ -124,7 +125,7 @@ namespace Scrutiny.Models
         {
             get
             {
-                return System.IO.Path.Combine(Path, UsnEntry.Name);
+                return System.IO.Path.Combine(Path, UsnJournalEntry.Name);
             }
         }
 
