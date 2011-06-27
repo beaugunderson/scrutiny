@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 
 namespace NTFS
 {
+    [Serializable]
     public class UsnJournalEntry : IComparable<UsnJournalEntry>
     {
         private const UInt32 FILE_ATTRIBUTE_DIRECTORY = 0x00000010;
