@@ -48,12 +48,12 @@ namespace ScrutinyTests
 
                 Assert.IsNotNull(searchResult.PathAndName);
 
-                Assert.IsNotNull(searchResult.Size);
+                Assert.IsNotNull(searchResult.SizeInBytes);
                 Assert.IsNotNull(searchResult.LastModified);
 
                 Trace.WriteLine(searchResult.PathAndName);
 
-                Trace.WriteLine(searchResult.Size);
+                Trace.WriteLine(searchResult.SizeInBytes);
                 Trace.WriteLine(searchResult.LastModified);
 
                 count++;

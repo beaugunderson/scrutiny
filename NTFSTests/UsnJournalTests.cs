@@ -46,7 +46,7 @@ namespace NTFSTests
             Types.BY_HANDLE_FILE_INFORMATION? fileInformation;
 
             // TODO: Create the file ourselves
-            int result = _journal.GetFileInformation(@"C:\Test.txt", out fileInformation);
+            int result = UsnJournal.GetFileInformation(@"C:\Test.txt", out fileInformation);
 
             Assert.IsTrue(result == 0);
 

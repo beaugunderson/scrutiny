@@ -585,7 +585,7 @@ namespace Scrutiny.Windows
 
                     break;
                 case "Size":
-                    function = item => item.Size;
+                    function = item => item.SizeInBytes;
 
                     break;
                 case "LastModified":

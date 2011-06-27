@@ -11,9 +11,8 @@ namespace NTFS
     {
         private readonly DriveInfo _driveInfo;
         private readonly uint _volumeSerialNumber;
-        private IntPtr _usnJournalRootHandle;
+        private readonly IntPtr _usnJournalRootHandle;
 
-        private readonly bool IsNtfsVolume;
         private bool _readMore;
 
         public string VolumeName
@@ -78,8 +77,6 @@ namespace NTFS
                 throw new Exception(string.Format("{0} is not an 'NTFS' volume.", _driveInfo.Name));
             }
 
-            IsNtfsVolume = true;
-
             IntPtr rootHandle;
 
             var returnCode = GetRootHandle(out rootHandle);
@@ -90,6 +87,11 @@ namespace NTFS
             }
 
             _usnJournalRootHandle = rootHandle;
+
+            if (_usnJournalRootHandle.ToInt32() == NativeMethods.INVALID_HANDLE_VALUE)
+            {
+                throw new UsnJournalException(Enums.UsnJournalReturnCode.INVALID_HANDLE_VALUE);
+            }
 
             returnCode = GetVolumeSerialNumber(_driveInfo, out _volumeSerialNumber);
 
@@ -112,16 +114,6 @@ namespace NTFS
         public IEnumerable<UsnJournalEntry> 
             GetNtfsVolumeFolders()
         {
-            if (!IsNtfsVolume)
-            {
-                throw new UsnJournalException(Enums.UsnJournalReturnCode.VOLUME_NOT_NTFS);
-            }
-
-            if (_usnJournalRootHandle.ToInt32() == NativeMethods.INVALID_HANDLE_VALUE)
-            {
-                throw new UsnJournalException(Enums.UsnJournalReturnCode.INVALID_HANDLE_VALUE);
-            }
-
             var usnState = new Types.USN_JOURNAL_DATA();
 
             var returnCode = QueryUsnJournal(ref usnState);
@@ -256,16 +248,6 @@ namespace NTFS
 
             string[] fileTypes = filter.Split(' ', ',', ';');
 
-            if (!IsNtfsVolume)
-            {
-                throw new UsnJournalException(Enums.UsnJournalReturnCode.VOLUME_NOT_NTFS);
-            }
-
-            if (_usnJournalRootHandle.ToInt32() == NativeMethods.INVALID_HANDLE_VALUE)
-            {
-                throw new UsnJournalException(Enums.UsnJournalReturnCode.ERROR_INVALID_HANDLE);
-            }
-
             var usnState = new Types.USN_JOURNAL_DATA();
 
             var returnCode = QueryUsnJournal(ref usnState);
@@ -343,33 +325,13 @@ namespace NTFS
             Marshal.FreeHGlobal(pData);
         }
 
-        //public string GetPathFromHandle(IntPtr handle)
-        //{
-        //    var fileInfo = new Types.FILE_INFO();
-
-        //    bool result = NativeMethods.GetFileInformationByHandleEx(
-        //        handle,
-        //        NativeMethods.FILE_INFO_BY_HANDLE_CLASS.FileNameInfo,
-        //        fileInfo,
-        //        2048);
-
-        //    Console.WriteLine(fileInfo.FileNameInfo.FileNameLength);
-        //    Console.WriteLine(fileInfo.FileNameInfo.FileNamePointer);
-
-        //    //fileInfo = (Types.FILE_NAME_INFO) Marshal.PtrToStructure(fileInfo, typeof (Types.FILE_INFO));
-            
-        //    //string path = Marshal.PtrToStringUni((IntPtr) (fileInfo.ToInt32()) + 4), fileInfo.F.FileNameLength / sizeof(char));
-
-        //    return ""; // path;
-        //}
-
-        private string GetPathFromHandle2(IntPtr handle)
+        private static string GetPathFromHandle(IntPtr handle)
         {
             IntPtr fileInfoBuffer = Marshal.AllocHGlobal(2048);
 
             NativeMethods.ZeroMemory(fileInfoBuffer, 2048);
 
-            bool result = NativeMethods.GetFileInformationByHandleEx(
+            NativeMethods.GetFileInformationByHandleEx(
                 handle,
                 NativeMethods.FILE_INFO_BY_HANDLE_CLASS.FileNameInfo,
                 fileInfoBuffer,
@@ -391,16 +353,6 @@ namespace NTFS
         /// </remarks>
         public string GetPathFromFileReference(UInt64 frn)
         {
-            if (!IsNtfsVolume)
-            {
-                throw new UsnJournalException(Enums.UsnJournalReturnCode.VOLUME_NOT_NTFS);
-            }
-
-            if (_usnJournalRootHandle.ToInt32() == NativeMethods.INVALID_HANDLE_VALUE)
-            {
-                throw new UsnJournalException(Enums.UsnJournalReturnCode.INVALID_HANDLE_VALUE);
-            }
-
             if (frn == 0)
             {
                 throw new UsnJournalException(Enums.UsnJournalReturnCode.INVALID_FILE_REFERENCE_NUMBER);
@@ -413,31 +365,28 @@ namespace NTFS
             var objectAttributes = new Types.OBJECT_ATTRIBUTES();
             var ioStatusBlock = new Types.IO_STATUS_BLOCK();
 
-            IntPtr hFile = IntPtr.Zero;
+            IntPtr handle = IntPtr.Zero;
 
             IntPtr buffer = Marshal.AllocHGlobal(4096);
             IntPtr refPtr = Marshal.AllocHGlobal(8);
 
             IntPtr objAttIntPtr = Marshal.AllocHGlobal(Marshal.SizeOf(objectAttributes));
 
-            // Pointer >> FRN
             Marshal.WriteInt64(refPtr, (long) frn);
 
             unicodeString.Length = 8;
             unicodeString.MaximumLength = 8;
             unicodeString.Buffer = refPtr;
 
-            // Copy unicode structure to pointer
             Marshal.StructureToPtr(unicodeString, objAttIntPtr, true);
 
-            // InitializeObjectAttributes 
             objectAttributes.Length = Marshal.SizeOf(objectAttributes);
             objectAttributes.ObjectName = objAttIntPtr;
             objectAttributes.RootDirectory = _usnJournalRootHandle;
             objectAttributes.Attributes = (int) NativeMethods.OBJ_CASE_INSENSITIVE;
 
             int result = NativeMethods.NtCreateFile(
-                ref hFile,
+                ref handle,
                 FileAccess.Read,
                 ref objectAttributes,
                 ref ioStatusBlock,
@@ -452,10 +401,10 @@ namespace NTFS
 
             if (result == 0)
             {
-                path = GetPathFromHandle2(hFile);
+                path = GetPathFromHandle(handle);
             }
 
-            NativeMethods.CloseHandle(hFile);
+            NativeMethods.CloseHandle(handle);
 
             Marshal.FreeHGlobal(buffer);
             Marshal.FreeHGlobal(objAttIntPtr);
@@ -476,16 +425,6 @@ namespace NTFS
         public Enums.UsnJournalReturnCode
             GetUsnJournalState(ref Types.USN_JOURNAL_DATA usnJournalState)
         {
-            if (!IsNtfsVolume)
-            {
-                return Enums.UsnJournalReturnCode.VOLUME_NOT_NTFS;
-            }
-
-            if (_usnJournalRootHandle.ToInt32() == NativeMethods.INVALID_HANDLE_VALUE)
-            {
-                return Enums.UsnJournalReturnCode.INVALID_HANDLE_VALUE;
-            }
-
             return QueryUsnJournal(ref usnJournalState);
         }
 
@@ -513,16 +452,6 @@ namespace NTFS
             usnEntries = new List<UsnJournalEntry>();
             newUsnState = new Types.USN_JOURNAL_DATA();
 
-            if (!IsNtfsVolume)
-            {
-                return Enums.UsnJournalReturnCode.VOLUME_NOT_NTFS;
-            }
-
-            if (_usnJournalRootHandle.ToInt32() == NativeMethods.INVALID_HANDLE_VALUE)
-            {
-                return Enums.UsnJournalReturnCode.INVALID_HANDLE_VALUE;
-            }
-            
             // Get current journal state
             var returnCode = QueryUsnJournal(ref newUsnState);
 
@@ -644,16 +573,6 @@ namespace NTFS
         {
             var state = new Types.USN_JOURNAL_DATA();
 
-            if (!IsNtfsVolume)
-            {
-                return Enums.UsnJournalReturnCode.VOLUME_NOT_NTFS;
-            }
-
-            if (_usnJournalRootHandle.ToInt32() == NativeMethods.INVALID_HANDLE_VALUE)
-            {
-                return Enums.UsnJournalReturnCode.INVALID_HANDLE_VALUE;
-            }
-
             var returnCode = QueryUsnJournal(ref state);
 
             if (returnCode != Enums.UsnJournalReturnCode.USN_JOURNAL_SUCCESS)
@@ -750,16 +669,6 @@ namespace NTFS
         {
             bool result = false;
 
-            if (!IsNtfsVolume)
-            {
-                return false;
-            }
-
-            if (_usnJournalRootHandle.ToInt32() == NativeMethods.INVALID_HANDLE_VALUE)
-            {
-                return false;
-            }
-
             var usnJournalCurrentState = new Types.USN_JOURNAL_DATA();
             var usnError = QueryUsnJournal(ref usnJournalCurrentState);
 
@@ -782,40 +691,25 @@ namespace NTFS
         public bool
             IsUsnJournalValid(Types.USN_JOURNAL_DATA usnJournalPreviousState)
         {
-            bool result = false;
-
-            if (!IsNtfsVolume)
-            {
-                return false;
-            }
-
-            if (_usnJournalRootHandle.ToInt32() == NativeMethods.INVALID_HANDLE_VALUE)
-            {
-                return false;
-            }
-
             var usnJournalState = new Types.USN_JOURNAL_DATA();
+
             var usnError = QueryUsnJournal(ref usnJournalState);
 
-            if (usnError == Enums.UsnJournalReturnCode.USN_JOURNAL_SUCCESS)
+            if (usnError == Enums.UsnJournalReturnCode.USN_JOURNAL_SUCCESS && 
+                usnJournalPreviousState.UsnJournalID == usnJournalState.UsnJournalID &&
+                usnJournalPreviousState.NextUsn >= usnJournalState.NextUsn)
             {
-                if (usnJournalPreviousState.UsnJournalID == usnJournalState.UsnJournalID)
-                {
-                    if (usnJournalPreviousState.NextUsn >= usnJournalState.NextUsn)
-                    {
-                        result = true;
-                    }
-                }
+                return true;
             }
 
-            return result;
+            return false;
         }
 
         /// <summary>
         /// Converts a Win32 Error to a UsnJournalReturnCode
         /// </summary>
         /// <param name="Win32LastError">The 'last' NativeMethods error.</param>
-        private Enums.UsnJournalReturnCode
+        private static Enums.UsnJournalReturnCode
             ConvertWin32ErrorToUsnError(NativeMethods.GetLastErrorEnum Win32LastError)
         {
             Enums.UsnJournalReturnCode returnCode;
@@ -839,10 +733,10 @@ namespace NTFS
             return returnCode;
         }
 
-        public int 
+        public static int 
             GetFileInformation(string path, out Types.BY_HANDLE_FILE_INFORMATION? fileInformation)
         {
-            IntPtr hRoot = NativeMethods.CreateFile(path,
+            IntPtr handle = NativeMethods.CreateFile(path,
                 0,
                 NativeMethods.FILE_SHARE_READ | NativeMethods.FILE_SHARE_WRITE,
                 IntPtr.Zero,
@@ -850,15 +744,15 @@ namespace NTFS
                 NativeMethods.FILE_FLAG_BACKUP_SEMANTICS,
                 IntPtr.Zero);
 
-            if (hRoot.ToInt32() != NativeMethods.INVALID_HANDLE_VALUE)
+            if (handle.ToInt32() != NativeMethods.INVALID_HANDLE_VALUE)
             {
                 Types.BY_HANDLE_FILE_INFORMATION fileInformationTemp;
 
-                bool success = NativeMethods.GetFileInformationByHandle(hRoot, out fileInformationTemp);
+                bool success = NativeMethods.GetFileInformationByHandle(handle, out fileInformationTemp);
 
                 if (success)
                 {
-                    NativeMethods.CloseHandle(hRoot);
+                    NativeMethods.CloseHandle(handle);
 
                     fileInformation = fileInformationTemp;
 
@@ -877,16 +771,16 @@ namespace NTFS
         /// <param name="driveInfo">DriveInfo object representing the volume in question.</param>
         /// <param name="volumeSerialNumber">out parameter to hold the volume serial number.</param>
         /// <returns></returns>
-        private Enums.UsnJournalReturnCode
+        private static Enums.UsnJournalReturnCode
             GetVolumeSerialNumber(DriveInfo driveInfo, out uint volumeSerialNumber)
         {
             volumeSerialNumber = 0;
 
-            Enums.UsnJournalReturnCode returnCode = Enums.UsnJournalReturnCode.USN_JOURNAL_SUCCESS;
+            var returnCode = Enums.UsnJournalReturnCode.USN_JOURNAL_SUCCESS;
 
-            string pathRoot = string.Concat("\\\\.\\", driveInfo.Name);
+            string pathandle = string.Concat("\\\\.\\", driveInfo.Name);
 
-            IntPtr hRoot = NativeMethods.CreateFile(pathRoot,
+            IntPtr handle = NativeMethods.CreateFile(pathandle,
                 0,
                 NativeMethods.FILE_SHARE_READ | NativeMethods.FILE_SHARE_WRITE,
                 IntPtr.Zero,
@@ -894,17 +788,14 @@ namespace NTFS
                 NativeMethods.FILE_FLAG_BACKUP_SEMANTICS,
                 IntPtr.Zero);
 
-            if (hRoot.ToInt32() != NativeMethods.INVALID_HANDLE_VALUE)
+            if (handle.ToInt32() != NativeMethods.INVALID_HANDLE_VALUE)
             {
                 Types.BY_HANDLE_FILE_INFORMATION fileInformation;
 
-                bool result = NativeMethods.GetFileInformationByHandle(hRoot, out fileInformation);
+                bool result = NativeMethods.GetFileInformationByHandle(handle, out fileInformation);
 
                 if (result)
                 {
-                    //var fileIndexHigh = (UInt64)fi.FileIndexHigh;
-                    //var indexRoot = (fileIndexHigh << 32) | fi.FileIndexLow;
-
                     volumeSerialNumber = fileInformation.VolumeSerialNumber;
                 }
                 else
@@ -912,7 +803,7 @@ namespace NTFS
                     returnCode = (Enums.UsnJournalReturnCode)Marshal.GetLastWin32Error();
                 }
 
-                NativeMethods.CloseHandle(hRoot);
+                NativeMethods.CloseHandle(handle);
             }
             else
             {
@@ -925,8 +816,6 @@ namespace NTFS
         private Enums.UsnJournalReturnCode
             GetRootHandle(out IntPtr rootHandle)
         {
-            // private functions don't need to check for an NTFS volume or
-            // a valid _usnJournalRootHandle handle
             var returnCode = Enums.UsnJournalReturnCode.USN_JOURNAL_SUCCESS;
 
             string vol = string.Concat("\\\\.\\", _driveInfo.Name.TrimEnd('\\'));
@@ -955,8 +844,6 @@ namespace NTFS
         private Enums.UsnJournalReturnCode
             QueryUsnJournal(ref Types.USN_JOURNAL_DATA usnJournalState)
         {
-            // Private functions don't need to check for an NTFS volume or
-            // a valid _usnJournalRootHandle handle
             var usnReturnCode = Enums.UsnJournalReturnCode.USN_JOURNAL_SUCCESS;
             int sizeUsnJournalState = Marshal.SizeOf(usnJournalState);
             UInt32 cb;
@@ -973,8 +860,6 @@ namespace NTFS
 
             if (!result)
             {
-                //int lastWin32Error = Marshal.GetLastWin32Error();
-
                 usnReturnCode = ConvertWin32ErrorToUsnError((NativeMethods.GetLastErrorEnum)Marshal.GetLastWin32Error());
             }
 

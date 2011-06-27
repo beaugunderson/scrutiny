@@ -75,7 +75,7 @@ namespace Scrutiny.Models
                 //{
                 Types.BY_HANDLE_FILE_INFORMATION? fileInformation;
 
-                Journal.GetFileInformation(PathAndName, out fileInformation);
+                UsnJournal.GetFileInformation(PathAndName, out fileInformation);
 
                 if (!fileInformation.HasValue)
                 {
@@ -89,7 +89,7 @@ namespace Scrutiny.Models
             }
         }
 
-        public Int64 Size
+        public Int64 SizeInBytes
         {
             get
             {
@@ -101,7 +101,7 @@ namespace Scrutiny.Models
         {
             get
             {
-                return Size.FormatBytes();
+                return SizeInBytes.FormatBytes();
             }
         }
 
@@ -134,16 +134,9 @@ namespace Scrutiny.Models
             return PathAndName;
         }
 
-        public int CompareTo(object obj)
+        public int CompareTo(object other)
         {
-            var searchResult = obj as SearchResult;
-
-            if (searchResult == null)
-            {
-                throw new ArgumentException("Comparison object is not a SearchResult");
-            }
-
-            return AlphanumComparator.Compare(this, searchResult);
+            return AlphanumComparator.Compare(this, other as SearchResult);
         }
 
         [field: NonSerialized]
