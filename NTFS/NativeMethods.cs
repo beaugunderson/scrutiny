@@ -2,11 +2,13 @@
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Security;
 using System.Text;
 using Microsoft.Win32.SafeHandles;
 
 namespace NTFS
 {
+    [SuppressUnmanagedCodeSecurityAttribute]
     public static class NativeMethods
     {
         public enum GetLastErrorEnum
