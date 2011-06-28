@@ -30,7 +30,7 @@
 			<Setter Property="Padding" Value="0,1,0,1"></Setter>
 		</Style>
 
-		<WPF:HighlightConverter x:Key="HighlightConverter" />
+		<WPF:HighlightConverter x:Key="HighlightConverter" IsCaseSensitive="{Binding Path=IsCaseSensitive}" />
 		
 		<DataTemplate x:Key="AscendingTemplate">
 			<Grid>

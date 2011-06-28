@@ -13,7 +13,7 @@ namespace NTFS
         /// </summary>
         [Serializable]
         [StructLayout(LayoutKind.Sequential, Pack = 1)]
-        public struct BY_HANDLE_FILE_INFORMATION
+        public class BY_HANDLE_FILE_INFORMATION
         {
             public uint FileAttributes;
             public FileTime CreationTime;
@@ -31,7 +31,6 @@ namespace NTFS
         /// USN Journal Data structure, contains USN Journal ID(64bits), First USN(64bits), Next USN(64bits),
         /// Lowest Valid USN(64bits), Max USN(64bits), Maximum Size(64bits) and Allocation Delta(64bits).
         /// </summary>
-        // XXX: To class? How?
         [StructLayout(LayoutKind.Sequential, Pack = 1)]
         public struct USN_JOURNAL_DATA
         {
@@ -67,7 +66,7 @@ namespace NTFS
             public UInt32 ReasonMask;
             public UInt32 ReturnOnlyOnClose;
             public UInt64 Timeout;
-            public UInt64 bytesToWaitFor;
+            public UInt64 BytesToWaitFor;
             public UInt64 UsnJournalId;
         }
 
@@ -118,14 +117,13 @@ namespace NTFS
             public UInt64 FileReferenceNumber;
             public UInt64 ParentFileReferenceNumber;
             public Int64 Usn;
-            public Int64 TimeStamp;  // strictly, this is a LARGE_INTEGER in C
+            public Int64 TimeStamp;
             public UInt32 Reason;
             public UInt32 SourceInfo;
             public UInt32 SecurityId;
             public UInt32 FileAttributes;
             public UInt16 FileNameLength;
             public UInt16 FileNameOffset;
-            // immediately after the FileNameOffset comes an array of WCHARs containing the FileName
         }
     }
 }

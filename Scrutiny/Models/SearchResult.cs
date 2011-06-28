@@ -66,26 +66,19 @@ namespace Scrutiny.Models
             }
         }
 
-        private Types.BY_HANDLE_FILE_INFORMATION? _fileInformation;
+        private Types.BY_HANDLE_FILE_INFORMATION _fileInformation;
         public Types.BY_HANDLE_FILE_INFORMATION FileInformation
         {
             get
             {
                 //LazyInitializer.EnsureInitialized(ref _fileInformation, delegate
                 //{
-                Types.BY_HANDLE_FILE_INFORMATION? fileInformation;
+                var fileInformation = UsnJournal.GetFileInformation(PathAndName);
 
-                UsnJournal.GetFileInformation(PathAndName, out fileInformation);
-
-                if (!fileInformation.HasValue)
-                {
-                    throw new ApplicationException("Failed to get file information");
-                }
-
-                _fileInformation = fileInformation.Value;
+                _fileInformation = fileInformation;
                 //});
 
-                return _fileInformation.Value;
+                return _fileInformation;
             }
         }
 

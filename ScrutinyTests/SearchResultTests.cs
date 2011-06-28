@@ -37,7 +37,7 @@ namespace ScrutinyTests
         {
             int count = 0;
 
-            foreach (var usnEntry in _journal.GetFilesMatchingFilter("*"))
+            foreach (var usnEntry in _journal.GetVolumeFiles())
             {
                 if (count > 25)
                 {
@@ -65,12 +65,9 @@ namespace ScrutinyTests
         [TestMethod]
         public void TestSequentialQuicksort()
         {
-            var context = new SynchronizationContext();
-            var searchResults = new ThreadSafeObservableCollection<SearchResult>(synchronizationContext: context);
-
             TestContext.BeginTimer("Reading journal");
 
-            var array = _journal.GetFilesMatchingFilter("*").ToArray();
+            var array = _journal.GetVolumeFiles().ToArray();
             
             TestContext.EndTimer("Reading journal");
 
@@ -84,12 +81,9 @@ namespace ScrutinyTests
         [TestMethod]
         public void TestParallelQuicksort()
         {
-            var context = new SynchronizationContext();
-            var searchResults = new ThreadSafeObservableCollection<SearchResult>(synchronizationContext: context);
-
             TestContext.BeginTimer("Reading journal");
 
-            var array = _journal.GetFilesMatchingFilter("*").ToArray();
+            var array = _journal.GetVolumeFiles().ToArray();
             
             TestContext.EndTimer("Reading journal");
 
@@ -120,7 +114,7 @@ namespace ScrutinyTests
 
             TestContext.BeginTimer("Reading journal");
 
-            _journal.GetFilesMatchingFilter("*")
+            _journal.GetVolumeFiles()
                 .AsParallel()
                 .WithDegreeOfParallelism(threads)
                 .Take(1000)

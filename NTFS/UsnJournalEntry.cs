@@ -45,12 +45,20 @@ namespace NTFS
             private set;
         }
 
-        public UsnJournalEntry(IntPtr usnEntryPointer)
+        public UsnJournalEntry(IntPtr pointer)
         {
-            UsnRecord = (Types.USN_RECORD) Marshal.PtrToStructure(usnEntryPointer, typeof(Types.USN_RECORD));
-        
-            // XXX: Is it possible to marshal this automatically?
-            Name = Marshal.PtrToStringUni(new IntPtr(usnEntryPointer.ToInt32() + UsnRecord.FileNameOffset), UsnRecord.FileNameLength / sizeof(char));
+            object usnRecord = Marshal.PtrToStructure(pointer, typeof(Types.USN_RECORD));
+
+            if (usnRecord == null)
+            {
+                throw new Exception("usnRecord was null.");
+            }
+
+            UsnRecord = (Types.USN_RECORD)usnRecord;
+
+            // We have to marshal this ourselves since the unmanaged code relies on a property of C arrays
+            // (C allows you to specify an out-of-bounds array index)
+            Name = Marshal.PtrToStringUni(pointer + UsnRecord.FileNameOffset, UsnRecord.FileNameLength / sizeof(char));
         }
 
         public int CompareTo(UsnJournalEntry other)

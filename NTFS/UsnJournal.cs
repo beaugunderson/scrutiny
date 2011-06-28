@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics.Contracts;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -12,9 +13,11 @@ namespace NTFS
     {
         private readonly DriveInfo _driveInfo;
         private readonly uint _volumeSerialNumber;
-        private readonly IntPtr _usnJournalRootHandle;
+        private readonly IntPtr _rootHandle;
 
         private bool _readMore;
+
+        private const int MAX_PATH = 260;
 
         public string VolumeName
         {
@@ -56,8 +59,15 @@ namespace NTFS
             get { return _volumeSerialNumber; }
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="symlink"></param>
+        /// <returns></returns>
         public static string GetSymbolicLinkTarget(DirectoryInfo symlink)
         {
+            Contract.Requires(symlink != null);
+            
             var directoryHandle = NativeMethods.NtCreateFile(
                 symlink.FullName, 
                 0, 
@@ -67,7 +77,7 @@ namespace NTFS
                 NativeMethods.FILE_FLAG_BACKUP_SEMANTICS,
                 IntPtr.Zero);
 
-            if (directoryHandle.IsInvalid)
+            if (directoryHandle == null || directoryHandle.IsInvalid)
             {
                 throw new Win32Exception(Marshal.GetLastWin32Error());
             }
@@ -75,22 +85,30 @@ namespace NTFS
             var path = new StringBuilder(512);
             
             int size = NativeMethods.GetFinalPathNameByHandle(directoryHandle.DangerousGetHandle(), path, path.Capacity, 0);
-            
+
             if (size < 0)
+            {
                 throw new Win32Exception(Marshal.GetLastWin32Error());
-            
+            }
+
+            string pathString = path.ToString();
+
             // The remarks section of GetFinalPathNameByHandle mentions the return being prefixed with "\\?\"
             // More information about "\\?\" here -> http://msdn.microsoft.com/en-us/library/aa365247(v=VS.85).aspx
-            if (path[0] == '\\' && path[1] == '\\' && path[2] == '?' && path[3] == '\\')
+            if (pathString.Length >= 4 && 
+                pathString[0] == '\\' && 
+                pathString[1] == '\\' && 
+                pathString[2] == '?' && 
+                pathString[3] == '\\')
             {
-                return path.ToString().Substring(4);
+                return pathString.Substring(4);
             }
             
-            return path.ToString();
+            return pathString;
         }
 
         /// <summary>
-        /// Constructor for NtfsUsnJournal class.  If no exception is thrown, _usnJournalRootHandle and
+        /// Constructor for NtfsUsnJournal class.  If no exception is thrown, _rootHandle and
         /// _volumeSerialNumber can be assumed to be good. If an exception is thrown, the NtfsUsnJournal
         /// object is not usable.
         /// </summary>
@@ -98,17 +116,25 @@ namespace NTFS
         /// <remarks> 
         /// An exception thrown if the volume is not an 'NTFS' volume or
         /// if GetRootHandle() or GetVolumeSerialNumber() functions fail. 
-        /// Each public method checks to see if the volume is NTFS and if the _usnJournalRootHandle is
-        /// valid.  If these two conditions aren't met, then the public function will return a UsnJournalReturnCode
+        /// Each public method checks to see if the volume is NTFS and if the _rootHandle is
+        /// valid. If these two conditions aren't met, then the public function will return a UsnJournalReturnCode
         /// error.
         /// </remarks>
         public UsnJournal(DriveInfo driveInfo)
         {
+            Contract.Requires(driveInfo != null);
+            Contract.Ensures(_driveInfo != null);
+
+            if (driveInfo == null)
+            {
+                throw new Exception("driveInfo was null.");
+            }
+
             _driveInfo = driveInfo;
 
             if (0 != string.Compare(_driveInfo.DriveFormat, "ntfs", true))
             {
-                throw new Exception(string.Format("{0} is not an 'NTFS' volume.", _driveInfo.Name));
+                throw new Exception(string.Format("{0} is not an NTFS volume.", _driveInfo.Name));
             }
 
             IntPtr rootHandle;
@@ -120,14 +146,14 @@ namespace NTFS
                 throw new Win32Exception((int)returnCode);
             }
 
-            _usnJournalRootHandle = rootHandle;
+            _rootHandle = rootHandle;
 
-            if (_usnJournalRootHandle.ToInt32() == NativeMethods.INVALID_HANDLE_VALUE)
+            if (_rootHandle.ToInt32() == NativeMethods.INVALID_HANDLE_VALUE)
             {
                 throw new UsnJournalException(Enums.UsnJournalReturnCode.INVALID_HANDLE_VALUE);
             }
 
-            returnCode = GetVolumeSerialNumber(_driveInfo, out _volumeSerialNumber);
+            returnCode = GetVolumeSerialNumber(out _volumeSerialNumber);
 
             if (returnCode != Enums.UsnJournalReturnCode.USN_JOURNAL_SUCCESS)
             {
@@ -136,15 +162,8 @@ namespace NTFS
         }
 
         /// <summary>
-        /// GetNtfsVolumeFolders() reads the Master File Table to find all of the folders on a volume 
-        /// and returns them in a List<UInt64, UsnJournalEntry> folders out parameter.
+        /// GetNtfsVolumeFolders() reads the MFT to find all of the folders on a volume.
         /// </summary>
-        /// <param name="folders">A List<string, UInt64> list where string is
-        /// the filename and UInt64 is the parent folder's file reference number
-        /// </param>
-        /// <remarks>
-        /// If function returns ERROR_ACCESS_DENIED you need to run application as an Administrator.
-        /// </remarks>
         public IEnumerable<UsnJournalEntry> 
             GetNtfsVolumeFolders()
         {
@@ -157,16 +176,18 @@ namespace NTFS
                 throw new UsnJournalException(returnCode);
             }
 
-            Types.MFT_ENUM_DATA med;
+            Types.MFT_ENUM_DATA mftEnumData;
 
-            med.StartFileReferenceNumber = 0;
-            med.LowUsn = 0;
-            med.HighUsn = usnState.NextUsn;
+            mftEnumData.StartFileReferenceNumber = 0;
+            mftEnumData.LowUsn = 0;
+            mftEnumData.HighUsn = usnState.NextUsn;
 
-            Int32 sizeMftEnumData = Marshal.SizeOf(med);
-            IntPtr medBuffer = Marshal.AllocHGlobal(sizeMftEnumData);
-            NativeMethods.ZeroMemory(medBuffer, sizeMftEnumData);
-            Marshal.StructureToPtr(med, medBuffer, true);
+            Int32 sizeMftEnumData = Marshal.SizeOf(mftEnumData);
+            IntPtr mftEnumDataBuffer = Marshal.AllocHGlobal(sizeMftEnumData);
+            
+            NativeMethods.ZeroMemory(mftEnumDataBuffer, sizeMftEnumData);
+            
+            Marshal.StructureToPtr(mftEnumData, mftEnumDataBuffer, true);
 
             // Set up the data buffer which receives the USN_RECORD data
             const int pDataSize = sizeof (UInt64) + 10000;
@@ -175,22 +196,22 @@ namespace NTFS
             
             NativeMethods.ZeroMemory(pData, pDataSize);
 
-            uint outBytesReturned;
+            uint bytesReturned;
 
             // Gather up volume's directories
             while (NativeMethods.DeviceIoControl(
-                _usnJournalRootHandle,
+                _rootHandle,
                 NativeMethods.FSCTL_ENUM_USN_DATA,
-                medBuffer,
+                mftEnumDataBuffer,
                 sizeMftEnumData,
                 pData,
                 pDataSize,
-                out outBytesReturned,
+                out bytesReturned,
                 IntPtr.Zero))
             {
-                var usnEntryPointer = new IntPtr(pData.ToInt32() + sizeof (Int64));
+                var usnEntryPointer = pData + sizeof (Int64);
 
-                while (outBytesReturned > 60)
+                while (bytesReturned > 60)
                 {
                     var usnEntry = new UsnJournalEntry(usnEntryPointer);
 
@@ -199,12 +220,12 @@ namespace NTFS
                         yield return usnEntry;
                     }
 
-                    usnEntryPointer = new IntPtr(usnEntryPointer.ToInt32() + usnEntry.UsnRecord.RecordLength);
+                    usnEntryPointer += (int) usnEntry.UsnRecord.RecordLength;
 
-                    outBytesReturned -= usnEntry.UsnRecord.RecordLength;
+                    bytesReturned -= usnEntry.UsnRecord.RecordLength;
                 }
 
-                Marshal.WriteInt64(medBuffer, Marshal.ReadInt64(pData, 0));
+                Marshal.WriteInt64(mftEnumDataBuffer, Marshal.ReadInt64(pData, 0));
             }
 
             Marshal.FreeHGlobal(pData);
@@ -246,7 +267,7 @@ namespace NTFS
 
             // Gather up the volume's directories
             while (NativeMethods.DeviceIoControl(
-                _usnJournalRootHandle,
+                _rootHandle,
                 NativeMethods.FSCTL_ENUM_USN_DATA,
                 medBuffer,
                 sizeMftEnumData,
@@ -255,7 +276,7 @@ namespace NTFS
                 out bytesReturned,
                 IntPtr.Zero))
             {
-                var usnEntryPointer = new IntPtr(pData.ToInt32() + sizeof (Int64));
+                var usnEntryPointer = pData + sizeof (Int64);
 
                 while (bytesReturned > 60)
                 {
@@ -263,7 +284,7 @@ namespace NTFS
 
                     yield return usnEntry;
 
-                    usnEntryPointer = new IntPtr(usnEntryPointer.ToInt32() + usnEntry.UsnRecord.RecordLength);
+                    usnEntryPointer += (int)usnEntry.UsnRecord.RecordLength;
 
                     bytesReturned -= usnEntry.UsnRecord.RecordLength;
                 }
@@ -274,6 +295,21 @@ namespace NTFS
             Marshal.FreeHGlobal(pData);
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        public IEnumerable<UsnJournalEntry>
+            GetVolumeFiles()
+        {
+            return GetFilesMatchingFilter("*");
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="filter"></param>
+        /// <returns></returns>
         public IEnumerable<UsnJournalEntry>
             GetFilesMatchingFilter(string filter)
         {
@@ -317,7 +353,7 @@ namespace NTFS
 
             // Gather up the volume's directories
             while (NativeMethods.DeviceIoControl(
-                _usnJournalRootHandle,
+                _rootHandle,
                 NativeMethods.FSCTL_ENUM_USN_DATA,
                 medBuffer,
                 sizeMftEnumData,
@@ -326,7 +362,7 @@ namespace NTFS
                 out bytesReturned,
                 IntPtr.Zero))
             {
-                var usnEntryPointer = new IntPtr(pData.ToInt32() + sizeof(Int64));
+                var usnEntryPointer = pData + sizeof(Int64);
 
                 while (bytesReturned > 60)
                 {
@@ -349,7 +385,7 @@ namespace NTFS
                         }
                     }
 
-                    usnEntryPointer = new IntPtr(usnEntryPointer.ToInt32() + usnEntry.UsnRecord.RecordLength);
+                    usnEntryPointer += (int)usnEntry.UsnRecord.RecordLength;
 
                     bytesReturned -= usnEntry.UsnRecord.RecordLength;
                 }
@@ -360,34 +396,39 @@ namespace NTFS
             Marshal.FreeHGlobal(pData);
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="handle"></param>
+        /// <returns></returns>
         private static string GetPathFromHandle(IntPtr handle)
         {
-            IntPtr fileInfoBuffer = Marshal.AllocHGlobal(2048);
+            IntPtr fileInfoBuffer = Marshal.AllocHGlobal(MAX_PATH);
 
-            NativeMethods.ZeroMemory(fileInfoBuffer, 2048);
+            NativeMethods.ZeroMemory(fileInfoBuffer, MAX_PATH);
 
             NativeMethods.GetFileInformationByHandleEx(
                 handle,
                 Enums.FILE_INFO_BY_HANDLE_CLASS.FileNameInfo,
                 fileInfoBuffer,
-                2048);
+                MAX_PATH);
 
             int length = Marshal.ReadInt32(fileInfoBuffer);
 
-            string path = Marshal.PtrToStringUni((IntPtr) (fileInfoBuffer.ToInt32() + 4), length / sizeof(char));
+            string path = Marshal.PtrToStringUni(fileInfoBuffer + 4, length / sizeof(char));
 
             return path;
         }
 
         /// <summary>
-        /// Given a file reference number GetPathFromFrn() calculates the full path in the out parameter 'path'.
+        /// 
         /// </summary>
-        /// <param name="frn">A 64-bit file reference number</param>
-        /// <remarks>
-        /// If function returns ERROR_ACCESS_DENIED you need to run application as an Administrator.
-        /// </remarks>
-        public string GetPathFromFileReference(UInt64 frn)
+        /// <param name="frn"></param>
+        /// <returns></returns>
+        private IntPtr GetHandleFromFileReference(UInt64 frn)
         {
+            Contract.Requires(frn != 0);
+
             if (frn == 0)
             {
                 throw new UsnJournalException(Enums.UsnJournalReturnCode.INVALID_FILE_REFERENCE_NUMBER);
@@ -417,10 +458,10 @@ namespace NTFS
 
             objectAttributes.Length = Marshal.SizeOf(objectAttributes);
             objectAttributes.ObjectName = objAttIntPtr;
-            objectAttributes.RootDirectory = _usnJournalRootHandle;
+            objectAttributes.RootDirectory = _rootHandle;
             objectAttributes.Attributes = (int) NativeMethods.OBJ_CASE_INSENSITIVE;
 
-            int result = NativeMethods.NtCreateFile(
+            int success = NativeMethods.NtCreateFile(
                 ref handle,
                 FileAccess.Read,
                 ref objectAttributes,
@@ -432,18 +473,26 @@ namespace NTFS
                 NativeMethods.FILE_OPEN_BY_FILE_ID | NativeMethods.FILE_OPEN_FOR_BACKUP_INTENT,
                 IntPtr.Zero, 0);
 
-            string path = null;
-
-            if (result == 0)
-            {
-                path = GetPathFromHandle(handle);
-            }
-
-            NativeMethods.CloseHandle(handle);
-
             Marshal.FreeHGlobal(buffer);
             Marshal.FreeHGlobal(objAttIntPtr);
             Marshal.FreeHGlobal(refPtr);
+
+            return handle;
+        }
+
+        /// <summary>
+        /// Returns the full path given the file reference number.
+        /// </summary>
+        /// <param name="frn">A 64-bit file reference number</param>
+        public string GetPathFromFileReference(UInt64 frn)
+        {
+            Contract.Requires(frn != 0);
+
+            var handle = GetHandleFromFileReference(frn);
+
+            string path = GetPathFromHandle(handle);
+
+            NativeMethods.CloseHandle(handle);
 
             return path;
         }
@@ -451,12 +500,7 @@ namespace NTFS
         /// <summary>
         /// GetUsnJournalState() gets the current state of the USN Journal if it is active.
         /// </summary>
-        /// <param name="usnJournalState">
-        /// Reference to usn journal data object filled with the current USN Journal state.
-        /// </param>
-        /// <remarks>
-        /// If function returns ERROR_ACCESS_DENIED you need to run application as an Administrator.
-        /// </remarks>
+        /// <param name="usnJournalState">Reference to usn journal data object filled with the current USN Journal state.</param>
         public Enums.UsnJournalReturnCode
             GetUsnJournalState(ref Types.USN_JOURNAL_DATA usnJournalState)
         {
@@ -466,18 +510,14 @@ namespace NTFS
         /// <summary>
         /// Given a previous state, GetUsnJournalEntries() determines if the USN Journal is active and
         /// no USN Journal entries have been lost (i.e. USN Journal is valid), then
-        /// it loads a List<UsnJournalEntry> list and returns it as the out parameter 'usnEntries'.
-        /// If GetUsnJournalChanges returns anything but USN_JOURNAL_SUCCESS, the usnEntries list will 
+        /// it loads a <see cref="List{UsnJournalEntry}"/> and returns it as the out parameter 'usnEntries'.
+        /// If GetUsnJournalChanges returns anything but USN_JOURNAL_SUCCESS the usnEntries list will 
         /// be empty.
         /// </summary>
-        /// <param name="previousUsnState">The USN Journal state the last time volume 
-        /// changes were requested.</param>
+        /// <param name="previousUsnState">The journal state since the last time volume changes were requested.</param>
         /// <param name="reasonMask"></param>
         /// <param name="usnEntries"></param>
         /// <param name="newUsnState"></param>
-        /// <remarks>
-        /// If function returns ERROR_ACCESS_DENIED you need to run application as an Administrator.
-        /// </remarks>
         public Enums.UsnJournalReturnCode
             GetUsnJournalEntries(Types.USN_JOURNAL_DATA previousUsnState,
                 UInt32 reasonMask,
@@ -497,7 +537,6 @@ namespace NTFS
 
             bool readMore = true;
 
-            // Sequentially process the usn journal looking for image file entries
             const int pbDataSize = sizeof (UInt64)*0x4000;
 
             IntPtr pbData = Marshal.AllocHGlobal(pbDataSize);
@@ -510,39 +549,41 @@ namespace NTFS
                 ReasonMask = reasonMask,
                 ReturnOnlyOnClose = 0,
                 Timeout = 0,
-                bytesToWaitFor = 0,
+                BytesToWaitFor = 0,
                 UsnJournalId = previousUsnState.UsnJournalID
             };
 
             int sizeRujd = Marshal.SizeOf(rujd);
 
             IntPtr rujdBuffer = Marshal.AllocHGlobal(sizeRujd);
+
             NativeMethods.ZeroMemory(rujdBuffer, sizeRujd);
+            
             Marshal.StructureToPtr(rujd, rujdBuffer, true);
 
             // Read USN journal entries
             while (readMore)
             {
-                uint outBytesReturned;
+                uint bytesReturned;
 
-                bool result = NativeMethods.DeviceIoControl(
-                    _usnJournalRootHandle,
+                bool success = NativeMethods.DeviceIoControl(
+                    _rootHandle,
                     NativeMethods.FSCTL_READ_USN_JOURNAL,
                     rujdBuffer,
                     sizeRujd,
                     pbData,
                     pbDataSize,
-                    out outBytesReturned,
+                    out bytesReturned,
                     IntPtr.Zero);
 
                 var lastWin32Error = (Enums.GetLastErrorEnum) Marshal.GetLastWin32Error();
 
-                if (result)
+                if (success)
                 {
-                    var usnEntryPointer = new IntPtr(pbData.ToInt32() + sizeof (UInt64));
+                    var usnEntryPointer = pbData + sizeof(UInt64);
 
                     // While there is at least one entry in the usn journal 
-                    while (outBytesReturned > 60)
+                    while (bytesReturned > 60)
                     {
                         var usnEntry = new UsnJournalEntry(usnEntryPointer);
 
@@ -556,9 +597,9 @@ namespace NTFS
 
                         usnEntries.Add(usnEntry);
 
-                        usnEntryPointer = new IntPtr(usnEntryPointer.ToInt32() + usnEntry.UsnRecord.RecordLength);
+                        usnEntryPointer += (int)usnEntry.UsnRecord.RecordLength;
 
-                        outBytesReturned -= usnEntry.UsnRecord.RecordLength;
+                        bytesReturned -= usnEntry.UsnRecord.RecordLength;
                     }
                 }
                 else
@@ -627,7 +668,7 @@ namespace NTFS
                 ReasonMask = reasonMask,
                 ReturnOnlyOnClose = 0,
                 Timeout = 1,
-                bytesToWaitFor = 1,
+                BytesToWaitFor = 1,
                 UsnJournalId = state.UsnJournalID
             };
 
@@ -646,8 +687,8 @@ namespace NTFS
             {
                 uint bytesReturned;
 
-                bool returnValue = NativeMethods.DeviceIoControl(
-                    _usnJournalRootHandle,
+                bool success = NativeMethods.DeviceIoControl(
+                    _rootHandle,
                     NativeMethods.FSCTL_READ_USN_JOURNAL,
                     rujdBuffer,
                     sizeRujd,
@@ -656,7 +697,7 @@ namespace NTFS
                     out bytesReturned,
                     IntPtr.Zero);
 
-                if (!returnValue)
+                if (!success)
                 {
                     var lastWin32Error = (Enums.GetLastErrorEnum) Marshal.GetLastWin32Error();
 
@@ -668,7 +709,7 @@ namespace NTFS
                                : ConvertWin32ErrorToUsnError(lastWin32Error);
                 }
 
-                var usnEntryPointer = new IntPtr(pbData.ToInt32() + sizeof (UInt64));
+                var usnEntryPointer = pbData + sizeof(UInt64);
 
                 // While there are at least one entry in the usn journal
                 // XXX: Why magic number 60?
@@ -678,7 +719,7 @@ namespace NTFS
 
                     OnNewUsnRecord(new NewUsnRecordEventArgs(usnEntry));
 
-                    usnEntryPointer = new IntPtr(usnEntryPointer.ToInt32() + usnEntry.UsnRecord.RecordLength);
+                    usnEntryPointer += (int)usnEntry.UsnRecord.RecordLength;
 
                     bytesReturned -= usnEntry.UsnRecord.RecordLength;
                 }
@@ -702,16 +743,6 @@ namespace NTFS
         public bool
             IsUsnJournalActive()
         {
-            bool result = false;
-
-            var usnJournalCurrentState = new Types.USN_JOURNAL_DATA();
-            var usnError = QueryUsnJournal(ref usnJournalCurrentState);
-
-            if (usnError == Enums.UsnJournalReturnCode.USN_JOURNAL_SUCCESS)
-            {
-                result = true;
-            }
-
             var currentState = new Types.USN_JOURNAL_DATA();
 
             var usnError = QueryUsnJournal(ref currentState);
@@ -771,10 +802,15 @@ namespace NTFS
             return returnCode;
         }
 
-        public static int 
-            GetFileInformation(string path, out Types.BY_HANDLE_FILE_INFORMATION? fileInformation)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="path"></param>
+        /// <returns></returns>
+        public static Types.BY_HANDLE_FILE_INFORMATION 
+            GetFileInformation(string path)
         {
-            IntPtr handle = NativeMethods.CreateFile(path,
+            var handle = NativeMethods.CreateFile(path,
                 0,
                 NativeMethods.FILE_SHARE_READ | NativeMethods.FILE_SHARE_WRITE,
                 IntPtr.Zero,
@@ -784,23 +820,19 @@ namespace NTFS
 
             if (handle.ToInt32() != NativeMethods.INVALID_HANDLE_VALUE)
             {
-                Types.BY_HANDLE_FILE_INFORMATION fileInformationTemp;
+                var fileInformation = new Types.BY_HANDLE_FILE_INFORMATION();
 
-                bool success = NativeMethods.GetFileInformationByHandle(handle, out fileInformationTemp);
+                bool success = NativeMethods.GetFileInformationByHandle(handle, fileInformation);
 
                 if (success)
                 {
                     NativeMethods.CloseHandle(handle);
 
-                    fileInformation = fileInformationTemp;
-
-                    return 0;
+                    return fileInformation;
                 }
             }
 
-            fileInformation = new Types.BY_HANDLE_FILE_INFORMATION();
-
-            return Marshal.GetLastWin32Error();
+            return new Types.BY_HANDLE_FILE_INFORMATION();
         }
 
         /// <summary>
@@ -809,13 +841,13 @@ namespace NTFS
         /// <param name="driveInfo">DriveInfo object representing the volume in question.</param>
         /// <param name="volumeSerialNumber">out parameter to hold the volume serial number.</param>
         private Enums.UsnJournalReturnCode
-            GetVolumeSerialNumber(DriveInfo driveInfo, out uint volumeSerialNumber)
+            GetVolumeSerialNumber(out uint volumeSerialNumber)
         {
             volumeSerialNumber = 0;
 
             var returnCode = Enums.UsnJournalReturnCode.USN_JOURNAL_SUCCESS;
 
-            string pathRoot = string.Concat("\\\\.\\", driveInfo.Name);
+            string pathRoot = string.Concat("\\\\.\\", _driveInfo.Name);
 
             var handle = NativeMethods.CreateFile(pathRoot,
                 0,
@@ -827,9 +859,9 @@ namespace NTFS
 
             if (handle.ToInt32() != NativeMethods.INVALID_HANDLE_VALUE)
             {
-                Types.BY_HANDLE_FILE_INFORMATION fileInformation;
+                var fileInformation = new Types.BY_HANDLE_FILE_INFORMATION();
 
-                bool result = NativeMethods.GetFileInformationByHandle(handle, out fileInformation);
+                bool result = NativeMethods.GetFileInformationByHandle(handle, fileInformation);
 
                 if (result)
                 {
@@ -844,12 +876,17 @@ namespace NTFS
             }
             else
             {
-                returnCode = (Enums.UsnJournalReturnCode)Marshal.GetLastWin32Error();
+                return (Enums.UsnJournalReturnCode)Marshal.GetLastWin32Error();
             }
 
             return returnCode;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="rootHandle"></param>
+        /// <returns></returns>
         private Enums.UsnJournalReturnCode
             GetRootHandle(out IntPtr rootHandle)
         {
@@ -886,8 +923,8 @@ namespace NTFS
 
             UInt32 cb;
 
-            bool result = NativeMethods.DeviceIoControl(
-                _usnJournalRootHandle,
+            bool success = NativeMethods.DeviceIoControl(
+                _rootHandle,
                 NativeMethods.FSCTL_QUERY_USN_JOURNAL,
                 IntPtr.Zero,
                 0,
@@ -896,7 +933,7 @@ namespace NTFS
                 out cb,
                 IntPtr.Zero);
 
-            if (!result)
+            if (!success)
             {
                 usnReturnCode = ConvertWin32ErrorToUsnError((Enums.GetLastErrorEnum)Marshal.GetLastWin32Error());
             }
@@ -904,9 +941,12 @@ namespace NTFS
             return usnReturnCode;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
         public void Dispose()
         {
-            NativeMethods.CloseHandle(_usnJournalRootHandle);
+            NativeMethods.CloseHandle(_rootHandle);
         }
     }
 }

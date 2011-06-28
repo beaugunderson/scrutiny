@@ -1,5 +1,4 @@
 ﻿using System;
-using System.ComponentModel;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Security;
@@ -71,7 +70,7 @@ namespace NTFS
         public static extern bool 
             GetFileInformationByHandle(
                 [In] IntPtr hFile, 
-                [Out] out Types.BY_HANDLE_FILE_INFORMATION lpFileInformation);
+                [Out] Types.BY_HANDLE_FILE_INFORMATION lpFileInformation);
 
         [DllImport("kernel32.dll", EntryPoint="GetFileInformationByHandleEx", CharSet=CharSet.Unicode)]
         [return: MarshalAs(UnmanagedType.Bool)]
